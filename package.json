@@ -1,0 +1,57 @@
+{
+  "name": "@scriptonita/chess-football-ui",
+  "version": "0.1.0",
+  "description": "Shared, framework-agnostic React UI for Chess.Football: board, pieces, scoreboard, controls and the game store. Consumed by the Next.js app and the CrazyGames Vite SPA.",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Scriptonita/chess-football-ui.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@scriptonita/chess-football-engine": "^0.1.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.3.0",
+    "zustand": "^5.0.9"
+  },
+  "peerDependencies": {
+    "framer-motion": ">=12",
+    "lucide-react": ">=1",
+    "react": ">=19",
+    "react-dom": ">=19"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "framer-motion": "^12.23.26",
+    "lucide-react": "^1.17.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.7.0"
+  }
+}
