@@ -106,6 +106,9 @@ function HistoryRow({ entry, isLatest }: HistoryRowProps) {
         case 'goal':
             label = t('history.goal', { from: fromSq, to: toSq })
             break
+        case 'offside':
+            label = t('history.offside', { from: fromSq })
+            break
         case 'move':
         default:
             label = t('history.move', { piece: pieceShort, from: fromSq, to: toSq })
@@ -116,6 +119,7 @@ function HistoryRow({ entry, isLatest }: HistoryRowProps) {
         entry.type === 'pass'         ? 'bg-pass-highlight' :
         entry.type === 'interception' ? 'bg-danger' :
         entry.type === 'tackle'       ? 'bg-danger/80' :
+        entry.type === 'offside'      ? 'bg-warning' :
                                         'bg-move-highlight'
 
     return (

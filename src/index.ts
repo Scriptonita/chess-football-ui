@@ -16,7 +16,10 @@ export { Avatar, AvatarImage, AvatarFallback } from './components/ui/avatar'
 export { ConfirmDialog } from './components/ui/confirm-dialog'
 
 // ── Store ─────────────────────────────────────────────────────────────────────
-export { useGameStore, getInitialBoardState } from './store/use-game-store'
+// Exported from the dedicated, framework-pure `./store` subpath instead — it must
+// stay free of client-only React APIs so server code (e.g. Next.js route handlers
+// calling getInitialBoardState) can import it without pulling in the client bundle.
+// See ./store/use-game-store.
 
 // ── i18n injection ────────────────────────────────────────────────────────────
 export { GameI18nProvider, useGameT, type GameTranslator } from './i18n'

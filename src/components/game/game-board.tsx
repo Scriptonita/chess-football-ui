@@ -3,8 +3,8 @@ import { getValidMoves, getValidPasses } from '@scriptonita/chess-football-engin
 import { cn } from '../../lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import GamePiece from './game-piece'
-import { useEffect, useMemo, useRef } from 'react'
-import { Side } from '@scriptonita/chess-football-engine'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Side, Position } from '@scriptonita/chess-football-engine'
 import { Football } from './football'
 import { FILE_LABELS, RANK_LABELS } from '@scriptonita/chess-football-engine'
 
@@ -12,13 +12,17 @@ interface GameBoardProps {
     userSide: Side | null
     /** When true, render A-I / 1-12 coordinate guides around the board (tablet+ only). */
     showCoordinates?: boolean
+    /** When true, the board is keyboard-operable (arrows move a cursor, Enter acts). */
+    keyboardNav?: boolean
 }
 
 // Board dimensions
 const COLS = 9
 const ROWS = 12
 
-export default function GameBoard({ userSide, showCoordinates = false }: GameBoardProps) {
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
+
+export default function GameBoard({ userSide, showCoordinates = false, keyboardNav = false }: GameBoardProps) {
     const {
         boardState,
         selectedPieceId,
@@ -29,15 +33,37 @@ export default function GameBoard({ userSide, showCoordinates = false }: GameBoa
         passBall
     } = useGameStore()
 
+    // Keyboard cursor (only used when keyboardNav). Null until the board is focused.
+    const [cursor, setCursor] = useState<Position | null>(null)
+
     const prevBallRef = useRef(boardState?.ball)
     const prevBall = prevBallRef.current
     useEffect(() => {
         prevBallRef.current = boardState?.ball
     })
 
-    if (!boardState) return null
+    // Hooks must run unconditionally and in a stable order, so these memos are
+    // computed (null-safe) BEFORE any early return. They recompute the selected
+    // piece internally to avoid a hook running after a conditional return.
+    const validMoves = useMemo(() => {
+        if (!boardState) return []
+        const sp = boardState.pieces.find(p => p.id === selectedPieceId)
+        if (sp && interactionMode === 'move' && !sp.hasMovedThisTurn) {
+            return getValidMoves(sp, boardState)
+        }
+        return []
+    }, [boardState, selectedPieceId, interactionMode])
 
-    const selectedPiece = boardState.pieces.find(p => p.id === selectedPieceId)
+    const validPasses = useMemo(() => {
+        if (!boardState) return []
+        const sp = boardState.pieces.find(p => p.id === selectedPieceId)
+        if (sp && interactionMode === 'pass') {
+            return getValidPasses(sp, boardState)
+        }
+        return []
+    }, [boardState, selectedPieceId, interactionMode])
+
+    if (!boardState) return null
 
     // Detect ball pickup-during-move so we can synchronize the ball pulse with the
     // carrier piece. Both the carrier and the ball use the same linear tween below.
@@ -70,20 +96,6 @@ export default function GameBoard({ userSide, showCoordinates = false }: GameBoa
             ? Math.min(0.85, Math.max(0.15, stepsToBall / totalSteps))
             : 0.5
     }
-
-    const validMoves = useMemo(() => {
-        if (selectedPiece && interactionMode === 'move' && !selectedPiece.hasMovedThisTurn) {
-            return getValidMoves(selectedPiece, boardState)
-        }
-        return []
-    }, [selectedPiece, interactionMode, boardState])
-
-    const validPasses = useMemo(() => {
-        if (selectedPiece && interactionMode === 'pass') {
-            return getValidPasses(selectedPiece, boardState)
-        }
-        return []
-    }, [selectedPiece, interactionMode, boardState])
 
     const handleSquareClick = (x: number, y: number) => {
         if (interactionMode === 'move' && selectedPieceId) {
@@ -124,6 +136,51 @@ export default function GameBoard({ userSide, showCoordinates = false }: GameBoa
         }
     }
 
+    // ── Keyboard navigation (opt-in) ──────────────────────────────────────────
+    // A focused board is operated with arrows (move cursor), Enter/Space (act on the
+    // cursor square, mirroring a click), M/P (toggle move/pass) and Escape (deselect).
+    const defaultCursor = (): Position => {
+        const sel = boardState.pieces.find(p => p.id === selectedPieceId)
+        return sel ? { ...sel.pos } : { ...boardState.ball.pos }
+    }
+
+    const activate = (x: number, y: number) => {
+        const pieceAt = boardState.pieces.find(p => p.pos.x === x && p.pos.y === y)
+        if (pieceAt) {
+            handlePieceClick(pieceAt.id, x, y, { stopPropagation() {} } as React.MouseEvent)
+        } else {
+            handleSquareClick(x, y)
+        }
+    }
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (!keyboardNav) return
+        const step = (dx: number, dy: number) => {
+            e.preventDefault()
+            setCursor(c => {
+                const base = c ?? defaultCursor()
+                return { x: clamp(base.x + dx, 0, COLS - 1), y: clamp(base.y + dy, 0, ROWS - 1) }
+            })
+        }
+        switch (e.key) {
+            case 'ArrowUp':    step(0, 1); break    // visually up = higher rank (y grows toward the top)
+            case 'ArrowDown':  step(0, -1); break
+            case 'ArrowLeft':  step(-1, 0); break
+            case 'ArrowRight': step(1, 0); break
+            case 'Enter':
+            case ' ': {
+                e.preventDefault()
+                const c = cursor ?? defaultCursor()
+                setCursor(c)
+                activate(c.x, c.y)
+                break
+            }
+            case 'm': case 'M': setInteractionMode('move'); break
+            case 'p': case 'P': setInteractionMode('pass'); break
+            case 'Escape': setSelectedPieceId(null); setInteractionMode(null); break
+        }
+    }
+
     // Render only the squares (no pieces inside them)
     const renderSquares = () => {
         const squares = []
@@ -136,6 +193,7 @@ export default function GameBoard({ userSide, showCoordinates = false }: GameBoa
                 const isValidDest = validMoves.some(m => m.x === x && m.y === y) ||
                     validPasses.some(p => p.x === x && p.y === y)
                 const pieceAt = boardState.pieces.find(p => p.pos.x === x && p.pos.y === y)
+                const isCursor = keyboardNav && cursor?.x === x && cursor?.y === y
 
                 squares.push(
                     <div
@@ -157,6 +215,10 @@ export default function GameBoard({ userSide, showCoordinates = false }: GameBoa
                                 interactionMode === 'move' ? "bg-yellow-400/40" : "bg-sky-400/40"
                             )} />
                         )}
+                        {/* Keyboard cursor */}
+                        {isCursor && (
+                            <div className="absolute inset-0 ring-2 ring-inset ring-white pointer-events-none z-20" aria-hidden="true" />
+                        )}
                     </div>
                 )
             }
@@ -165,7 +227,21 @@ export default function GameBoard({ userSide, showCoordinates = false }: GameBoa
     }
 
     const board = (
-        <div className="w-full max-w-[500px] mx-auto overflow-hidden rounded-xl shadow-2xl border-4 border-[#1a3317] bg-[#1a3317]">
+        <div
+            className={cn(
+                "w-full max-w-[500px] mx-auto overflow-hidden rounded-xl shadow-2xl border-4 border-[#1a3317] bg-[#1a3317]",
+                keyboardNav && "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary",
+            )}
+            {...(keyboardNav
+                ? {
+                    tabIndex: 0,
+                    role: 'application',
+                    'aria-label': 'Game board — arrow keys to move the cursor, Enter to act',
+                    onKeyDown: handleKeyDown,
+                    onFocus: () => setCursor(c => c ?? defaultCursor()),
+                }
+                : {})}
+        >
             <div className="relative" style={{ containerType: 'inline-size' }}>
                 {/* Grid of squares */}
                 <div className="grid grid-cols-9 gap-[1px]">

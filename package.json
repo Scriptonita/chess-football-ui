@@ -24,6 +24,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./store": {
+      "types": "./dist/store.d.ts",
+      "import": "./dist/store.js",
+      "require": "./dist/store.cjs"
     }
   },
   "scripts": {
@@ -33,7 +38,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@scriptonita/chess-football-engine": "^0.1.0",
+    "@scriptonita/chess-football-engine": "file:../chess-football-engine",
     "clsx": "^2.1.1",
     "tailwind-merge": "^3.3.0",
     "zustand": "^5.0.9"
@@ -49,8 +54,6 @@
     "@types/react-dom": "^19.0.0",
     "framer-motion": "^12.23.26",
     "lucide-react": "^1.17.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
     "tsup": "^8.5.0",
     "typescript": "^5.7.0"
   }
