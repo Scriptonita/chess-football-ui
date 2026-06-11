@@ -1,3 +1,7 @@
+<p align="center">
+  <img alt="Chess.Football" src="./assets/cover.png" />
+</p>
+
 # @scriptonita/chess-football-ui
 
 Shared, framework-agnostic React UI for **Chess.Football**: board, pieces, scoreboard,
@@ -7,6 +11,17 @@ Next.js app (`futbolajedrez`) and the CrazyGames Vite SPA (`chess-football-crazy
 It builds on top of [`@scriptonita/chess-football-engine`](https://www.npmjs.com/package/@scriptonita/chess-football-engine)
 (the pure rules engine) and adds the **presentation layer** that was previously duplicated
 across both games.
+
+> **Rules source of truth:** the human-readable spec lives at
+> [github.com/Scriptonita/chess.football](https://github.com/Scriptonita/chess.football),
+> implemented in code by [`@scriptonita/chess-football-engine`](https://www.npmjs.com/package/@scriptonita/chess-football-engine).
+> This package is the shared presentation layer on top of it.
+
+## Install
+
+```bash
+npm install @scriptonita/chess-football-ui
+```
 
 ## Design notes
 

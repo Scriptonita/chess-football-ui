@@ -4,13 +4,12 @@
   "description": "Shared, framework-agnostic React UI for Chess.Football: board, pieces, scoreboard, controls and the game store. Consumed by the Next.js app and the CrazyGames Vite SPA.",
   "type": "module",
   "license": "MIT",
-  "private": true,
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Scriptonita/chess-football-ui.git"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public"
   },
   "sideEffects": false,
   "files": [
@@ -38,7 +37,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@scriptonita/chess-football-engine": "file:../chess-football-engine",
+    "@scriptonita/chess-football-engine": "^0.2.0",
     "clsx": "^2.1.1",
     "tailwind-merge": "^3.3.0",
     "zustand": "^5.0.9"
