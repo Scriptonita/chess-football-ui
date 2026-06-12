@@ -42,6 +42,8 @@ export default function Scoreboard({
   const myKingMustRelease    = isMyTurn  && kingMustRelease === turn
   const rivalKingMustRelease = !isMyTurn && kingMustRelease === turn
 
+  const maxAP = boardState.maxActionPoints ?? 5
+
   return (
     <div className="w-full bg-bg-secondary flex items-center justify-between px-5 py-2.5">
       {/* Jugador local */}
@@ -51,6 +53,7 @@ export default function Scoreboard({
         avatarUrl={myAvatar}
         isActive={isMyTurn}
         actionPoints={isMyTurn ? actionPoints : 0}
+        maxActionPoints={maxAP}
         kingMustRelease={myKingMustRelease}
         align="left"
       />
@@ -73,6 +76,7 @@ export default function Scoreboard({
         avatarUrl={rivalAvatar}
         isActive={!isMyTurn}
         actionPoints={!isMyTurn ? actionPoints : 0}
+        maxActionPoints={maxAP}
         kingMustRelease={rivalKingMustRelease}
         align="right"
       />
@@ -86,11 +90,12 @@ interface PlayerInfoProps {
   avatarUrl?: string
   isActive:  boolean
   actionPoints: number
+  maxActionPoints: number
   kingMustRelease: boolean
   align:     'left' | 'right'
 }
 
-function PlayerInfo({ name, team, avatarUrl, isActive, actionPoints, kingMustRelease, align }: PlayerInfoProps) {
+function PlayerInfo({ name, team, avatarUrl, isActive, actionPoints, maxActionPoints, kingMustRelease, align }: PlayerInfoProps) {
   return (
     <div className={cn('flex items-center gap-2.5', align === 'right' && 'flex-row-reverse')}>
       <Avatar className={cn(
@@ -117,7 +122,7 @@ function PlayerInfo({ name, team, avatarUrl, isActive, actionPoints, kingMustRel
           )}
         </div>
         <ActionPoints
-          total={5}
+          total={maxActionPoints}
           remaining={actionPoints}
           size={12}
           kingMustRelease={kingMustRelease}

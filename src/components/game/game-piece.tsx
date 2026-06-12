@@ -25,16 +25,24 @@ const PIECE_ICON: Record<Piece['type'], LucideIcon> = {
     knight: ChessKnight,
 }
 
-const PieceIcon = ({ type }: { type: Piece['type'] }) => {
+// Embossed glyph: with the light source at the top-left (same as the chip's
+// radial gradient), a raised figure catches a thin highlight on its upper edge
+// and casts a short shadow below. Tuned per side so it reads on both chips.
+const EMBOSS_FILTER: Record<Piece['side'], string> = {
+    white: 'drop-shadow(0 -0.75px 0 rgba(255,255,255,0.65)) drop-shadow(0 1.25px 1px rgba(0,0,0,0.45))',
+    black: 'drop-shadow(0 -0.5px 0 rgba(255,255,255,0.3)) drop-shadow(0 1.25px 1.5px rgba(0,0,0,0.8))',
+}
+
+const PieceIcon = ({ type, side }: { type: Piece['type']; side: Piece['side'] }) => {
     const Icon = PIECE_ICON[type] ?? ShieldQuestion
     // Size scales with the board container width (cqw); clamp keeps the glyph
     // readable on small screens and avoids overflow on very large ones.
     const style: React.CSSProperties = {
         width: 'clamp(16px, 7.4cqw, 44px)',
         height: 'clamp(16px, 7.4cqw, 44px)',
-        filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.35))',
+        filter: EMBOSS_FILTER[side],
     }
-    return <Icon style={style} strokeWidth={1.75} aria-hidden="true" />
+    return <Icon style={style} strokeWidth={2} aria-hidden="true" />
 }
 
 // 3D piece styling: radial gradient for top-left light source + layered
@@ -84,10 +92,19 @@ export default function GamePiece({ piece, isSelected, hasBall, onClick }: GameP
                 piece.hasMovedThisTurn && "opacity-70"
             )}
         >
-            <PieceIcon type={piece.type} />
+            <PieceIcon type={piece.type} side={piece.side} />
 
             {hasBall && (
                 <div className="absolute inset-0 rounded-full ring-2 ring-orange-400 pointer-events-none" />
+            )}
+
+            {piece.hasMovedThisTurn && (
+                <span
+                    aria-hidden="true"
+                    className="absolute top-0.5 right-0.5 w-[14px] h-[14px] rounded-full bg-fg-muted/80 flex items-center justify-center text-[9px] text-bg-primary font-bold leading-none pointer-events-none"
+                >
+                    ✓
+                </span>
             )}
 
             {isSelected && (

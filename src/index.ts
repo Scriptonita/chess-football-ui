@@ -8,6 +8,9 @@ export { default as GameControls } from './components/game/game-controls'
 export { SelectedPieceDetail } from './components/game/selected-piece-detail'
 export { MoveHistory } from './components/game/move-history'
 export { StaticGameBoard } from './components/game/static-game-board'
+export { TurnBanner } from './components/game/turn-banner'
+export { EventToast } from './components/game/event-toast'
+export { MobileHistory } from './components/game/mobile-history'
 
 // ── UI primitives ─────────────────────────────────────────────────────────────
 export { ActionPoints } from './components/action-points'

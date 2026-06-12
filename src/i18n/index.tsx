@@ -1,4 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react'
+import { MotionConfig } from 'framer-motion'
 
 /**
  * A translator scoped to the `game` namespace: `t('turn')`, `t('whiteToMove')`, …
@@ -13,7 +14,13 @@ const fallback: GameTranslator = (key) => key
 const GameI18nContext = createContext<GameTranslator>(fallback)
 
 export function GameI18nProvider({ t, children }: { t: GameTranslator; children: ReactNode }) {
-  return <GameI18nContext.Provider value={t}>{children}</GameI18nContext.Provider>
+  return (
+    <GameI18nContext.Provider value={t}>
+      <MotionConfig reducedMotion="user">
+        {children}
+      </MotionConfig>
+    </GameI18nContext.Provider>
+  )
 }
 
 /** Returns the `game`-scoped translator provided by the host app (identity fallback). */
