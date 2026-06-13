@@ -107,6 +107,7 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
         isInEnemyArea(ballCarrier.pos, ballCarrier.side)
 
     const handleSquareClick = (x: number, y: number) => {
+        setCursor(null)
         const isValidMove = validMoves.some(m => m.x === x && m.y === y)
         const isValidPass = validPasses.some(p => p.x === x && p.y === y)
 
@@ -306,7 +307,6 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                     role: 'application',
                     'aria-label': 'Game board — arrow keys to move the cursor, Enter to act',
                     onKeyDown: handleKeyDown,
-                    onFocus: () => setCursor(c => c ?? defaultCursor()),
                 }
                 : {})}
         >

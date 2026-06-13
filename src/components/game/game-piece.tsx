@@ -98,14 +98,6 @@ export default function GamePiece({ piece, isSelected, hasBall, onClick }: GameP
                 <div className="absolute inset-0 rounded-full ring-2 ring-orange-400 pointer-events-none" />
             )}
 
-            {piece.hasMovedThisTurn && (
-                <span
-                    aria-hidden="true"
-                    className="absolute top-0.5 right-0.5 w-[14px] h-[14px] rounded-full bg-fg-muted/80 flex items-center justify-center text-[9px] text-bg-primary font-bold leading-none pointer-events-none"
-                >
-                    ✓
-                </span>
-            )}
 
             {isSelected && (
                 <div className="absolute inset-0 rounded-full animate-pulse ring-2 ring-yellow-400 ring-offset-2 ring-offset-transparent" />
