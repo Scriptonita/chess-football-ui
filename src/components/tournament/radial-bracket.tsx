@@ -76,7 +76,7 @@ function resolveMatchState(match: TournamentMatch, currentRound: RoundId, status
 }
 
 /** Badge outer radius per ring depth (round of 16 → finalists), growing slightly inward. */
-const BADGE_RADIUS: Record<RoundId, number> = { round16: 26, quarter: 30, semi: 34, final: 38 }
+const BADGE_RADIUS: Record<RoundId, number> = { round16: 32, quarter: 36, semi: 40, final: 44 }
 
 interface MatchInfo {
   match: TournamentMatch
@@ -312,8 +312,8 @@ function MatchBadge({
       >
         {!revealed || !display ? (
           <>
-            <circle r={radius} className="fill-bg-surface/40 stroke-border-subtle" strokeWidth={1.5} strokeDasharray="4 3" />
-            <text textAnchor="middle" dominantBaseline="central" className="fill-fg-muted text-[14px]" aria-hidden="true">
+            <circle r={radius} className="fill-bg-surface/40 stroke-fg-muted" strokeWidth={1.5} strokeDasharray="4 3" />
+            <text textAnchor="middle" dominantBaseline="central" className="fill-fg-muted text-[18px]" aria-hidden="true">
               {tbdLabel ?? '?'}
             </text>
           </>
@@ -322,15 +322,15 @@ function MatchBadge({
             <circle
               r={radius}
               style={{ fill: display.color ? `${display.color}33` : undefined, stroke: display.color ?? undefined }}
-              className={cn(!display.color && 'fill-bg-surface stroke-border-subtle', state === 'current' && 'stroke-accent-green')}
+              className={cn(!display.color && 'fill-bg-surface stroke-fg-muted', state === 'current' && 'stroke-accent-green')}
               strokeWidth={isPlayer ? 3 : 2}
             />
             {isPlayer && <circle r={radius + 4} className="fill-none stroke-accent-green/60" strokeWidth={1.5} />}
-            <text textAnchor="middle" dominantBaseline="central" className="fill-fg-primary text-[15px] font-semibold" aria-hidden="true">
+            <text textAnchor="middle" dominantBaseline="central" className="fill-fg-primary text-[20px] font-semibold" aria-hidden="true">
               {display.avatar}
             </text>
             {score !== null && (
-              <text y={radius + 16} textAnchor="middle" className="fill-fg-muted text-[11px] font-mono tabular-nums" aria-hidden="true">
+              <text y={radius + 20} textAnchor="middle" className="fill-fg-muted text-[13px] font-mono tabular-nums" aria-hidden="true">
                 {score}
               </text>
             )}
@@ -359,11 +359,14 @@ function ConnectorLine({ conn, matchInfo, getDisplay, animateDraw, delay }: {
       strokeWidth={resolved.isCurrent ? 3 : 1.5}
       style={color ? { stroke: color } : undefined}
       className={cn(
-        !color && 'stroke-border-subtle',
+        // fg-muted (not border-subtle) so the bracket's structural lines stay
+        // clearly visible even before a match is decided — only the winning
+        // path's color and the current match's glow should stand out further.
+        !color && 'stroke-fg-muted',
         resolved.isCurrent && 'stroke-accent-green animate-pulse',
       )}
       initial={animateDraw ? { pathLength: 0, opacity: 0 } : false}
-      animate={{ pathLength: 1, opacity: winnerRevealed || resolved.isCurrent ? 1 : 0.35 }}
+      animate={{ pathLength: 1, opacity: winnerRevealed || resolved.isCurrent ? 1 : 0.6 }}
       transition={{ delay, duration: 0.4 }}
     />
   )
