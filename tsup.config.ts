@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     store: 'src/store/use-game-store.ts',
+    'tournament-store': 'src/store/use-tournament-store.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,

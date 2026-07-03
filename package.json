@@ -1,6 +1,6 @@
 {
   "name": "@scriptonita/chess-football-ui",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Shared, framework-agnostic React UI for Chess.Football: board, pieces, scoreboard, controls and the game store. Consumed by the Next.js app and the CrazyGames Vite SPA.",
   "type": "module",
   "license": "MIT",
@@ -28,12 +28,18 @@
       "types": "./dist/store.d.ts",
       "import": "./dist/store.js",
       "require": "./dist/store.cjs"
+    },
+    "./tournament-store": {
+      "types": "./dist/tournament-store.d.ts",
+      "import": "./dist/tournament-store.js",
+      "require": "./dist/tournament-store.cjs"
     }
   },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
@@ -54,6 +60,7 @@
     "framer-motion": "^12.23.26",
     "lucide-react": "^1.17.0",
     "tsup": "^8.5.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.9"
   }
 }

@@ -18,6 +18,17 @@ export { Button, type ButtonProps } from './components/ui/button'
 export { Avatar, AvatarImage, AvatarFallback } from './components/ui/avatar'
 export { ConfirmDialog } from './components/ui/confirm-dialog'
 
+// ── Tournament (radial bracket) ─────────────────────────────────────────────────
+export {
+  default as RadialBracket,
+  type RadialBracketProps,
+  type RadialBracketLabels,
+} from './components/tournament/radial-bracket'
+export * from './tournament/model'
+export { layoutRadialBracket, matchNodeIds, type LayoutNode, type LayoutConnector, type RadialLayoutOptions } from './tournament/layout'
+// Tournament store is exported from the dedicated `./tournament-store` subpath
+// instead (same rationale as `./store`): keep it free of client-only React APIs.
+
 // ── Store ─────────────────────────────────────────────────────────────────────
 // Exported from the dedicated, framework-pure `./store` subpath instead — it must
 // stay free of client-only React APIs so server code (e.g. Next.js route handlers
