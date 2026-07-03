@@ -290,48 +290,54 @@ function MatchBadge({
 }) {
   const radius = BADGE_RADIUS[round] ?? 28
   const initial = reveal
-    ? { opacity: 0, scale: 0.9, y: 6 }
+    ? { opacity: 0, scale: 0.9 }
     : animateDraw
       ? { opacity: 0, scale: 0.8 }
       : false
 
+  // Positioning lives on a plain (non-motion) `<g>`: framer-motion manages the SVG
+  // `transform` attribute itself whenever it animates a transform-like value (scale,
+  // x, y, ...), which would silently overwrite a hand-set `transform="translate(...)"`
+  // on the same element and collapse every badge back to the origin. Animating scale
+  // on an inner `motion.g` instead keeps positioning and animation independent.
   return (
-    <motion.g
-      role="listitem"
-      aria-label={ariaLabel}
-      transform={`translate(${node.x}, ${node.y})`}
-      initial={initial}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ delay, duration: reveal ? 0.45 : 0.3, type: reveal || animateDraw ? 'spring' : 'tween', stiffness: 220, damping: 20 }}
-      className={cn(state === 'loser' && 'opacity-40 grayscale', state === 'current' && 'animate-pulse')}
-    >
-      {!revealed || !display ? (
-        <>
-          <circle r={radius} className="fill-bg-surface/40 stroke-border-subtle" strokeWidth={1.5} strokeDasharray="4 3" />
-          <text textAnchor="middle" dominantBaseline="central" className="fill-fg-muted text-[14px]" aria-hidden="true">
-            {tbdLabel ?? '?'}
-          </text>
-        </>
-      ) : (
-        <>
-          <circle
-            r={radius}
-            style={{ fill: display.color ? `${display.color}33` : undefined, stroke: display.color ?? undefined }}
-            className={cn(!display.color && 'fill-bg-surface stroke-border-subtle', state === 'current' && 'stroke-accent-green')}
-            strokeWidth={isPlayer ? 3 : 2}
-          />
-          {isPlayer && <circle r={radius + 4} className="fill-none stroke-accent-green/60" strokeWidth={1.5} />}
-          <text textAnchor="middle" dominantBaseline="central" className="fill-fg-primary text-[15px] font-semibold" aria-hidden="true">
-            {display.avatar}
-          </text>
-          {score !== null && (
-            <text y={radius + 16} textAnchor="middle" className="fill-fg-muted text-[11px] font-mono tabular-nums" aria-hidden="true">
-              {score}
+    <g transform={`translate(${node.x}, ${node.y})`}>
+      <motion.g
+        role="listitem"
+        aria-label={ariaLabel}
+        initial={initial}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay, duration: reveal ? 0.45 : 0.3, type: reveal || animateDraw ? 'spring' : 'tween', stiffness: 220, damping: 20 }}
+        className={cn(state === 'loser' && 'opacity-40 grayscale', state === 'current' && 'animate-pulse')}
+      >
+        {!revealed || !display ? (
+          <>
+            <circle r={radius} className="fill-bg-surface/40 stroke-border-subtle" strokeWidth={1.5} strokeDasharray="4 3" />
+            <text textAnchor="middle" dominantBaseline="central" className="fill-fg-muted text-[14px]" aria-hidden="true">
+              {tbdLabel ?? '?'}
             </text>
-          )}
-        </>
-      )}
-    </motion.g>
+          </>
+        ) : (
+          <>
+            <circle
+              r={radius}
+              style={{ fill: display.color ? `${display.color}33` : undefined, stroke: display.color ?? undefined }}
+              className={cn(!display.color && 'fill-bg-surface stroke-border-subtle', state === 'current' && 'stroke-accent-green')}
+              strokeWidth={isPlayer ? 3 : 2}
+            />
+            {isPlayer && <circle r={radius + 4} className="fill-none stroke-accent-green/60" strokeWidth={1.5} />}
+            <text textAnchor="middle" dominantBaseline="central" className="fill-fg-primary text-[15px] font-semibold" aria-hidden="true">
+              {display.avatar}
+            </text>
+            {score !== null && (
+              <text y={radius + 16} textAnchor="middle" className="fill-fg-muted text-[11px] font-mono tabular-nums" aria-hidden="true">
+                {score}
+              </text>
+            )}
+          </>
+        )}
+      </motion.g>
+    </g>
   )
 }
 
