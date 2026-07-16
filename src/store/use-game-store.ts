@@ -1,6 +1,10 @@
 import { create } from 'zustand'
-import type { BoardState, Piece, Side, Position, PieceType } from '@scriptonita/chess-football-engine'
+import type { BoardState, Position } from '@scriptonita/chess-football-engine'
 import { applyMove, applyPass, applyEndTurn } from '@scriptonita/chess-football-engine'
+
+// The canonical kickoff position lives in the engine (rules-adjacent). Re-exported
+// here so app imports from `@scriptonita/chess-football-ui/store` keep working.
+export { getInitialBoardState } from '@scriptonita/chess-football-engine'
 
 interface GameStore {
     boardState: BoardState | null
@@ -13,49 +17,6 @@ interface GameStore {
     movePiece: (pieceId: string, to: Position) => void
     passBall: (to: Position) => void
     endTurn: () => void
-}
-
-export const getInitialBoardState = (servingSide: Side, currentScore = { white: 0, black: 0 }, maxActionPoints = 5): BoardState => {
-    const pieces: Piece[] = []
-
-    const addPiece = (type: PieceType, side: Side, x: number, y: number) => {
-        pieces.push({ id: `${side}_${type}_${x}_${y}`, type, side, pos: { x, y }, hasMovedThisTurn: false })
-    }
-
-    // White pieces (bottom)
-    // King at row 1 (front area row). Bishops at y=2 (outside area). Queens at y=5 (kickoff row).
-    addPiece('rook',   'white', 0, 1)
-    addPiece('rook',   'white', 8, 1)
-    addPiece('bishop', 'white', 3, 2)
-    addPiece('bishop', 'white', 5, 2)
-    addPiece('king',   'white', 4, 1)
-    addPiece('queen',  'white', 4, 5)
-    addPiece('knight', 'white', 2, 4)
-    addPiece('knight', 'white', 6, 4)
-
-    // Black pieces (top, symmetric)
-    // King at row 10 (front area row). Bishops at y=9 (outside area). Queens at y=6 (kickoff row).
-    addPiece('rook',   'black', 0, 10)
-    addPiece('rook',   'black', 8, 10)
-    addPiece('bishop', 'black', 3, 9)
-    addPiece('bishop', 'black', 5, 9)
-    addPiece('king',   'black', 4, 10)
-    addPiece('queen',  'black', 4, 6)
-    addPiece('knight', 'black', 2, 7)
-    addPiece('knight', 'black', 6, 7)
-
-    const servingQueen = pieces.find(p => p.side === servingSide && p.type === 'queen')!
-
-    return {
-        pieces,
-        ball: { pos: { ...servingQueen.pos }, holderId: servingQueen.id },
-        score: currentScore,
-        actionPoints: maxActionPoints,
-        maxActionPoints,
-        turn: servingSide,
-        moveHistory: [],
-        turnNumber: 1,
-    }
 }
 
 export const useGameStore = create<GameStore>((set) => ({
