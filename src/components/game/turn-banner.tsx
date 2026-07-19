@@ -5,7 +5,7 @@ import { Zap } from 'lucide-react'
 
 interface TurnBannerProps {
     isMyTurn: boolean
-    /** Override for the "not my turn" label (e.g. "IA pensando…" in training mode). */
+    /** Override for the "not my turn" label (e.g. "Bot pensando…" in training mode). */
     waitingLabel?: string
     className?: string
 }
@@ -15,7 +15,7 @@ interface TurnBannerProps {
  * - My turn:  accent-green background + "TU TURNO" + AP counter
  * - Opponent: neutral background + waiting label
  *
- * Absorbs the floating "IA pensando…" toast in training mode when waitingLabel is set.
+ * Absorbs the floating "Bot pensando…" toast in training mode when waitingLabel is set.
  */
 export function TurnBanner({ isMyTurn, waitingLabel, className }: TurnBannerProps) {
     const t = useGameT()
