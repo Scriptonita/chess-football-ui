@@ -9,6 +9,34 @@ import { MotionConfig } from 'framer-motion'
  */
 export type GameTranslator = (key: string, values?: Record<string, unknown>) => string
 
+/**
+ * Manifest of every `game`-namespace key the package's components read via `useGameT`.
+ * Host apps use it to assert their translation catalogs cover the package (AD-4).
+ * Kept in sync with the `t('…')` calls in `src/components`; extend it when a component
+ * introduces a new key. No key names an AI/opponent brand — the roster owns identity.
+ */
+export const GAME_I18N_KEYS = [
+  'actionPointsAriaLabel',
+  'actionPointsShort',
+  'endTurn',
+  'endTurnConfirm',
+  'endTurnConfirmDescription',
+  'endTurnConfirmYes',
+  'endTurnKeepPlaying',
+  'move',
+  'offsideWarning',
+  'pass',
+  'teamBlack',
+  'teamWhite',
+  'turn',
+  'waitingRival',
+  'whiteToMove',
+  'yourTurn',
+] as const
+
+/** Union of the `game`-namespace keys the package reads. */
+export type GameI18nKey = (typeof GAME_I18N_KEYS)[number]
+
 const fallback: GameTranslator = (key) => key
 
 const GameI18nContext = createContext<GameTranslator>(fallback)

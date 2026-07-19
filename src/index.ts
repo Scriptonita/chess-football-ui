@@ -25,7 +25,7 @@ export { ConfirmDialog } from './components/ui/confirm-dialog'
 // See ./store/use-game-store.
 
 // ── i18n injection ────────────────────────────────────────────────────────────
-export { GameI18nProvider, useGameT, type GameTranslator } from './i18n'
+export { GameI18nProvider, useGameT, GAME_I18N_KEYS, type GameTranslator, type GameI18nKey } from './i18n'
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 export { cn } from './lib/utils'
