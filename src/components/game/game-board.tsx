@@ -265,7 +265,18 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
 
                         {isDisambiguateTarget && selectedPieceId && (
                             <div
-                                className="absolute z-50 bottom-full mb-1 left-1/2 -translate-x-1/2 flex gap-1 bg-bg-secondary border border-border-subtle rounded-md p-1 shadow-xl pointer-events-auto whitespace-nowrap"
+                                className={cn(
+                                    "absolute z-50 flex gap-1 bg-bg-secondary border border-border-subtle rounded-md p-1 shadow-xl pointer-events-auto whitespace-nowrap",
+                                    // The board container is `overflow-hidden` (for its rounded
+                                    // corners), so a popover that spills past an edge gets clipped.
+                                    // Anchor it inside the board on edge columns / the top row.
+                                    y === ROWS - 1 ? "top-full mt-1" : "bottom-full mb-1",
+                                    x === 0
+                                        ? "left-0"
+                                        : x === COLS - 1
+                                            ? "right-0"
+                                            : "left-1/2 -translate-x-1/2",
+                                )}
                                 onClick={e => e.stopPropagation()}
                             >
                                 <button
