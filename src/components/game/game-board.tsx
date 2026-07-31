@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import GamePiece from './game-piece'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Side, Position } from '@scriptonita/chess-football-engine'
+import { Side, Position, MoveHistoryEntry } from '@scriptonita/chess-football-engine'
 import { Football } from './football'
 import { FILE_LABELS, RANK_LABELS } from '@scriptonita/chess-football-engine'
 import { Move, HelpCircle } from 'lucide-react'
@@ -53,6 +53,37 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
     useEffect(() => {
         prevBallRef.current = boardState?.ball
     })
+
+    // §4: sequential replay of a just-finished opponent turn — when the turn
+    // hands back to userSide and the opponent recorded more than one action,
+    // briefly step through each origin/destination before settling on the
+    // real last move, so a multi-action turn doesn't read as a single jump.
+    const prevTurnRef = useRef(boardState?.turn)
+    const [replay, setReplay] = useState<{ steps: MoveHistoryEntry[]; index: number } | null>(null)
+    useEffect(() => {
+        const prevTurn = prevTurnRef.current
+        prevTurnRef.current = boardState?.turn
+        if (!boardState || prefersReducedMotion || userSide === null) return
+        if (prevTurn === boardState.turn || boardState.turn !== userSide) return
+
+        const lastEntry = boardState.moveHistory.at(-1)
+        if (!lastEntry) return
+        const steps = boardState.moveHistory.filter(
+            m => m.turnNumber === lastEntry.turnNumber && m.pieceSide !== userSide,
+        )
+        if (steps.length > 1) setReplay({ steps, index: 0 })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [boardState?.turn])
+
+    useEffect(() => {
+        if (!replay) return
+        if (replay.index >= replay.steps.length - 1) {
+            const id = setTimeout(() => setReplay(null), 350)
+            return () => clearTimeout(id)
+        }
+        const id = setTimeout(() => setReplay(r => (r ? { ...r, index: r.index + 1 } : null)), 350)
+        return () => clearTimeout(id)
+    }, [replay])
 
     const validMoves = useMemo(() => {
         if (!boardState) return []
@@ -240,8 +271,12 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                 const isValidPass = validPasses.some(p => p.x === x && p.y === y)
                 const isAmbiguous = isValidMove && isValidPass
 
-                const isLastMoveOrigin = lastMove?.from && lastMove.from.x === x && lastMove.from.y === y
-                const isLastMoveDest   = lastMove?.to   && lastMove.to.x   === x && lastMove.to.y   === y
+                // §4: while a sequential replay is in progress, the highlighted
+                // origin/destination trail follows the current replay step
+                // instead of the real last move.
+                const displayedLastMove = replay ? replay.steps[replay.index] : lastMove
+                const isLastMoveOrigin = displayedLastMove?.from && displayedLastMove.from.x === x && displayedLastMove.from.y === y
+                const isLastMoveDest   = displayedLastMove?.to   && displayedLastMove.to.x   === x && displayedLastMove.to.y   === y
                 const isLastMove = isLastMoveOrigin || isLastMoveDest
 
                 // §8: enemy goal area for offside warning

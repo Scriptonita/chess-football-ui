@@ -14,7 +14,7 @@ vi.mock('framer-motion', () => {
     motion: new Proxy({}, { get: (_t, tag: string) => make(tag) }),
     AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     MotionConfig: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-    useReducedMotion: () => false,
+    useReducedMotion: vi.fn(() => false),
   }
 })
 
@@ -28,6 +28,7 @@ vi.mock('@scriptonita/chess-football-engine', async (importOriginal) => {
 import GameBoard from './game-board'
 import { useGameStore, getInitialBoardState } from '../../store/use-game-store'
 import { getValidMoves, getValidPasses } from '@scriptonita/chess-football-engine'
+import { useReducedMotion } from 'framer-motion'
 
 beforeEach(() => {
   useGameStore.setState({ boardState: null, selectedPieceId: null, interactionMode: null })
@@ -199,5 +200,76 @@ describe('GameBoard — pass trajectory preview (§16)', () => {
 
     fireEvent.mouseLeave(target)
     expect(screen.queryByTestId('pass-trajectory-line')).not.toBeInTheDocument()
+  })
+})
+
+describe('GameBoard — sequential replay of a multi-action opponent turn (§4)', () => {
+  const ROWS = 12
+  const COLS = 9
+  const squareIndex = (x: number, y: number) => (ROWS - 1 - y) * COLS + x
+  const hasHighlight = (squares: NodeListOf<Element>, x: number, y: number) =>
+    squares[squareIndex(x, y)].className.includes('bg-last-move-highlight/20')
+
+  beforeEach(() => {
+    vi.mocked(getValidMoves).mockReturnValue([])
+    vi.mocked(getValidPasses).mockReturnValue([])
+  })
+
+  function opponentTurnBoardState() {
+    const boardState = getInitialBoardState('white')
+    boardState.turn = 'black'
+    boardState.turnNumber = 3
+    boardState.moveHistory = []
+    return boardState
+  }
+
+  function finishedOpponentTurnBoardState(boardState: ReturnType<typeof getInitialBoardState>) {
+    return {
+      ...boardState,
+      turn: 'white' as const,
+      lastMove: { type: 'move' as const, from: { x: 4, y: 6 }, to: { x: 5, y: 6 }, playerId: 'black_piece', at: 2 },
+      moveHistory: [
+        { type: 'move' as const, pieceType: 'rook' as const, pieceSide: 'black' as const, from: { x: 2, y: 6 }, to: { x: 3, y: 6 }, at: 1, turnNumber: 3 },
+        { type: 'move' as const, pieceType: 'rook' as const, pieceSide: 'black' as const, from: { x: 4, y: 6 }, to: { x: 5, y: 6 }, at: 2, turnNumber: 3 },
+      ],
+    }
+  }
+
+  it('reveals a multi-action opponent turn step by step before settling on the final move', () => {
+    vi.useFakeTimers()
+    const boardState = opponentTurnBoardState()
+    useGameStore.setState({ boardState, selectedPieceId: null })
+    const { container } = render(<GameBoard userSide="white" />)
+
+    act(() => { useGameStore.setState({ boardState: finishedOpponentTurnBoardState(boardState) }) })
+
+    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    expect(hasHighlight(squares, 2, 6)).toBe(true)
+    expect(hasHighlight(squares, 3, 6)).toBe(true)
+    expect(hasHighlight(squares, 4, 6)).toBe(false)
+
+    act(() => { vi.advanceTimersByTime(400) })
+
+    expect(hasHighlight(squares, 4, 6)).toBe(true)
+    expect(hasHighlight(squares, 5, 6)).toBe(true)
+    expect(hasHighlight(squares, 2, 6)).toBe(false)
+
+    vi.useRealTimers()
+  })
+
+  it('skips straight to the final move when prefers-reduced-motion is set', () => {
+    vi.mocked(useReducedMotion).mockReturnValue(true)
+    const boardState = opponentTurnBoardState()
+    useGameStore.setState({ boardState, selectedPieceId: null })
+    const { container } = render(<GameBoard userSide="white" />)
+
+    act(() => { useGameStore.setState({ boardState: finishedOpponentTurnBoardState(boardState) }) })
+
+    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    expect(hasHighlight(squares, 4, 6)).toBe(true)
+    expect(hasHighlight(squares, 5, 6)).toBe(true)
+    expect(hasHighlight(squares, 2, 6)).toBe(false)
+
+    vi.mocked(useReducedMotion).mockReturnValue(false)
   })
 })
