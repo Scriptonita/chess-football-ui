@@ -108,7 +108,7 @@ function HistoryChip({ lastMove, onClick, className }: HistoryChipProps) {
                 'bg-bg-surface border border-border-subtle',
                 'font-mono text-[11px] text-fg-secondary',
                 'hover:text-fg-primary hover:bg-bg-surface-elevated active:scale-95',
-                'transition-all duration-150',
+                'transition-all duration-150 motion-reduce:transition-none',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green',
                 className,
             )}
