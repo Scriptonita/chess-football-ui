@@ -1,7 +1,7 @@
 import { useGameStore } from '../../store/use-game-store'
 import { getValidMoves, getValidPasses, isInEnemyArea } from '@scriptonita/chess-football-engine'
 import { cn } from '../../lib/utils'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import GamePiece from './game-piece'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Side, Position } from '@scriptonita/chess-football-engine'
@@ -26,6 +26,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 
 export default function GameBoard({ userSide, showCoordinates = false, keyboardNav = true }: GameBoardProps) {
     const t = useGameT()
+    const prefersReducedMotion = useReducedMotion()
     const {
         boardState,
         selectedPieceId,
@@ -38,6 +39,13 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
     const [cursor, setCursor] = useState<Position | null>(null)
     const [disambiguateAt, setDisambiguateAt] = useState<Position | null>(null)
     const [shortcutsOpen, setShortcutsOpen] = useState(false)
+    const [invalidClickAt, setInvalidClickAt] = useState<(Position & { nonce: number }) | null>(null)
+
+    useEffect(() => {
+        if (!invalidClickAt) return
+        const id = setTimeout(() => setInvalidClickAt(null), 150)
+        return () => clearTimeout(id)
+    }, [invalidClickAt])
 
     const prevBallRef = useRef(boardState?.ball)
     const prevBall = prevBallRef.current
@@ -123,6 +131,11 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
             passBall({ x, y })
             setDisambiguateAt(null)
         } else {
+            // §16: subtle shake when a piece is selected but the target square
+            // isn't a legal move/pass — no-op clicks on empty board stay silent.
+            if (selectedPieceId) {
+                setInvalidClickAt({ x, y, nonce: Date.now() })
+            }
             setDisambiguateAt(null)
         }
     }
@@ -416,6 +429,26 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                             </motion.div>
                         )
                     })()}
+
+                    {/* §16: subtle shake feedback on an illegal move/pass target */}
+                    {invalidClickAt && (
+                        <motion.div
+                            key={invalidClickAt.nonce}
+                            data-testid="invalid-action-shake"
+                            aria-hidden="true"
+                            initial={false}
+                            animate={prefersReducedMotion ? { opacity: [0.9, 0] } : { x: [0, -3, 3, -3, 3, 0] }}
+                            transition={{ duration: 0.15 }}
+                            style={{
+                                position: 'absolute',
+                                left: `${(invalidClickAt.x / COLS) * 100}%`,
+                                top: `${((ROWS - 1 - invalidClickAt.y) / ROWS) * 100}%`,
+                                width: `${100 / COLS}%`,
+                                height: `${100 / ROWS}%`,
+                            }}
+                            className="ring-2 ring-inset ring-danger/70 rounded-sm"
+                        />
+                    )}
                 </div>
 
                 {/* §8: Offside warning chip overlaid on board bottom */}

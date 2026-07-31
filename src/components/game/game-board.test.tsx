@@ -1,17 +1,15 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 
 // framer-motion drives layout animations that jsdom can't run; replace its
 // primitives with plain elements so rendering is deterministic. Only DOM-safe
 // props are forwarded (motion-only props like `layout`/`animate` are dropped).
 vi.mock('framer-motion', () => {
   const make = (Tag: string) =>
-    ({ children, className, style, onClick }: {
+    ({ children, animate: _animate, initial: _initial, transition: _transition, layout: _layout, ...domProps }: {
       children?: React.ReactNode
-      className?: string
-      style?: React.CSSProperties
-      onClick?: React.MouseEventHandler
-    }) => <Tag className={className} style={style} onClick={onClick}>{children}</Tag>
+      [key: string]: unknown
+    }) => <Tag {...domProps}>{children}</Tag>
   return {
     motion: new Proxy({}, { get: (_t, tag: string) => make(tag) }),
     AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -20,11 +18,23 @@ vi.mock('framer-motion', () => {
   }
 })
 
+// Spy on move/pass validity so specific tests can force deterministic
+// "no legal destination" scenarios without depending on real board geometry.
+vi.mock('@scriptonita/chess-football-engine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@scriptonita/chess-football-engine')>()
+  return { ...actual, getValidMoves: vi.fn(actual.getValidMoves), getValidPasses: vi.fn(actual.getValidPasses) }
+})
+
 import GameBoard from './game-board'
 import { useGameStore, getInitialBoardState } from '../../store/use-game-store'
+import { getValidMoves, getValidPasses } from '@scriptonita/chess-football-engine'
 
 beforeEach(() => {
   useGameStore.setState({ boardState: null, selectedPieceId: null, interactionMode: null })
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
 })
 
 describe('GameBoard', () => {
@@ -95,5 +105,42 @@ describe('GameBoard — keyboard shortcuts tooltip (§12)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'shortcuts.buttonLabel' }))
     expect(screen.queryByText('shortcuts.title')).not.toBeInTheDocument()
+  })
+})
+
+describe('GameBoard — invalid-action shake (§16)', () => {
+  beforeEach(() => {
+    vi.mocked(getValidMoves).mockReturnValue([])
+    vi.mocked(getValidPasses).mockReturnValue([])
+  })
+
+  it('briefly shows shake feedback when clicking an illegal destination with a piece selected', () => {
+    vi.useFakeTimers()
+    useGameStore.setState({
+      boardState: getInitialBoardState('white'),
+      selectedPieceId: 'white_rook_0_1',
+    })
+    const { container } = render(<GameBoard userSide="white" />)
+
+    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    expect(squares.length).toBeGreaterThan(0)
+    fireEvent.click(squares[0])
+
+    expect(screen.getByTestId('invalid-action-shake')).toBeInTheDocument()
+
+    act(() => { vi.advanceTimersByTime(200) })
+    expect(screen.queryByTestId('invalid-action-shake')).not.toBeInTheDocument()
+
+    vi.useRealTimers()
+  })
+
+  it('does not shake when clicking a square with no piece selected', () => {
+    useGameStore.setState({ boardState: getInitialBoardState('white'), selectedPieceId: null })
+    const { container } = render(<GameBoard userSide="white" />)
+
+    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    fireEvent.click(squares[0])
+
+    expect(screen.queryByTestId('invalid-action-shake')).not.toBeInTheDocument()
   })
 })
