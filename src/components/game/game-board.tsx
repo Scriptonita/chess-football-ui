@@ -1,5 +1,5 @@
 import { useGameStore } from '../../store/use-game-store'
-import { getValidMoves, getValidPasses, isInEnemyArea } from '@scriptonita/chess-football-engine'
+import { getValidMoves, getValidPasses, getPath, isInEnemyArea } from '@scriptonita/chess-football-engine'
 import { cn } from '../../lib/utils'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import GamePiece from './game-piece'
@@ -40,6 +40,7 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
     const [disambiguateAt, setDisambiguateAt] = useState<Position | null>(null)
     const [shortcutsOpen, setShortcutsOpen] = useState(false)
     const [invalidClickAt, setInvalidClickAt] = useState<(Position & { nonce: number }) | null>(null)
+    const [hoveredPassAt, setHoveredPassAt] = useState<Position | null>(null)
 
     useEffect(() => {
         if (!invalidClickAt) return
@@ -114,6 +115,14 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
         ballCarrier.side === userSide &&
         boardState.turn === userSide &&
         isInEnemyArea(ballCarrier.pos, ballCarrier.side)
+
+    // §16: pass-trajectory preview — dashed line from the ball carrier to the
+    // hovered valid-pass square, red if an opposing piece sits on the path.
+    const passCarrier = boardState.pieces.find(p => p.id === selectedPieceId && boardState.ball.holderId === p.id) ?? null
+    const trajectoryPath = (hoveredPassAt && passCarrier) ? getPath(passCarrier.pos, hoveredPassAt) : null
+    const trajectoryIntercepted = !!(trajectoryPath && passCarrier && trajectoryPath
+        .slice(0, -1)
+        .some(sq => boardState.pieces.some(p => p.pos.x === sq.x && p.pos.y === sq.y && p.side !== passCarrier.side)))
 
     const handleSquareClick = (x: number, y: number) => {
         setCursor(null)
@@ -248,6 +257,8 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                     <div
                         key={`${x}-${y}`}
                         onClick={() => handleSquareClick(x, y)}
+                        onMouseEnter={() => { if (isValidPass) setHoveredPassAt({ x, y }) }}
+                        onMouseLeave={() => setHoveredPassAt(null)}
                         className={cn(
                             "relative aspect-square w-full flex items-center justify-center cursor-pointer",
                             isEven ? "bg-field-green-1" : "bg-field-green-2",
@@ -355,6 +366,20 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                     <circle cx="4.5" cy="10.5" r="0.1" fill="white" fillOpacity="0.5" />
                     <path d="M 3.086,2 A 1.5,1.5 0 0 0 5.914,2" fill="none" stroke="white" strokeOpacity="0.3" strokeWidth="0.05" />
                     <path d="M 3.086,10 A 1.5,1.5 0 0 1 5.914,10" fill="none" stroke="white" strokeOpacity="0.3" strokeWidth="0.05" />
+
+                    {hoveredPassAt && passCarrier && (
+                        <line
+                            data-testid="pass-trajectory-line"
+                            x1={passCarrier.pos.x + 0.5}
+                            y1={ROWS - 1 - passCarrier.pos.y + 0.5}
+                            x2={hoveredPassAt.x + 0.5}
+                            y2={ROWS - 1 - hoveredPassAt.y + 0.5}
+                            stroke={trajectoryIntercepted ? '#E54545' : '#38bdf8'}
+                            strokeWidth="0.08"
+                            strokeDasharray="0.15 0.1"
+                            strokeLinecap="round"
+                        />
+                    )}
                 </svg>
 
                 <div className="absolute inset-0 pointer-events-none">

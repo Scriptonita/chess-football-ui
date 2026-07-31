@@ -144,3 +144,60 @@ describe('GameBoard — invalid-action shake (§16)', () => {
     expect(screen.queryByTestId('invalid-action-shake')).not.toBeInTheDocument()
   })
 })
+
+describe('GameBoard — pass trajectory preview (§16)', () => {
+  const ROWS = 12
+  const COLS = 9
+  const squareIndex = (x: number, y: number) => (ROWS - 1 - y) * COLS + x
+
+  function setUpBallCarrierAt(x: number, y: number, extraPieces: ReturnType<typeof getInitialBoardState>['pieces'] = []) {
+    const boardState = getInitialBoardState('white')
+    const carrier = boardState.pieces[0]
+    carrier.pos = { x, y }
+    boardState.ball = { pos: { x, y }, holderId: carrier.id }
+    boardState.pieces = [...boardState.pieces.filter(p => p.id !== carrier.id), carrier, ...extraPieces]
+    useGameStore.setState({ boardState, selectedPieceId: carrier.id })
+    return carrier
+  }
+
+  beforeEach(() => {
+    vi.mocked(getValidMoves).mockReturnValue([])
+    vi.mocked(getValidPasses).mockReturnValue([{ x: 3, y: 5 }])
+  })
+
+  it('shows a safe-colored dashed line from the carrier to a hovered pass target', () => {
+    setUpBallCarrierAt(1, 5)
+    const { container } = render(<GameBoard userSide="white" />)
+
+    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    fireEvent.mouseEnter(squares[squareIndex(3, 5)])
+
+    const line = screen.getByTestId('pass-trajectory-line')
+    expect(line).toHaveAttribute('stroke', '#38bdf8')
+  })
+
+  it('shows a danger-colored line when an enemy piece sits on the path', () => {
+    const interceptor = { id: 'black_interceptor', type: 'rook' as const, side: 'black' as const, pos: { x: 2, y: 5 }, hasMovedThisTurn: false }
+    setUpBallCarrierAt(1, 5, [interceptor])
+    const { container } = render(<GameBoard userSide="white" />)
+
+    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    fireEvent.mouseEnter(squares[squareIndex(3, 5)])
+
+    const line = screen.getByTestId('pass-trajectory-line')
+    expect(line).toHaveAttribute('stroke', '#E54545')
+  })
+
+  it('hides the line on mouse leave', () => {
+    setUpBallCarrierAt(1, 5)
+    const { container } = render(<GameBoard userSide="white" />)
+
+    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    const target = squares[squareIndex(3, 5)]
+    fireEvent.mouseEnter(target)
+    expect(screen.getByTestId('pass-trajectory-line')).toBeInTheDocument()
+
+    fireEvent.mouseLeave(target)
+    expect(screen.queryByTestId('pass-trajectory-line')).not.toBeInTheDocument()
+  })
+})
