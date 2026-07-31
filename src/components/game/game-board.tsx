@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Side, Position } from '@scriptonita/chess-football-engine'
 import { Football } from './football'
 import { FILE_LABELS, RANK_LABELS } from '@scriptonita/chess-football-engine'
-import { Move } from 'lucide-react'
+import { Move, HelpCircle } from 'lucide-react'
 import { useGameT } from '../../i18n'
 
 interface GameBoardProps {
@@ -37,6 +37,7 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
 
     const [cursor, setCursor] = useState<Position | null>(null)
     const [disambiguateAt, setDisambiguateAt] = useState<Position | null>(null)
+    const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
     const prevBallRef = useRef(boardState?.ball)
     const prevBall = prevBallRef.current
@@ -421,6 +422,36 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                 {isOffsideRisk && (
                     <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-3 py-1.5 bg-warning/20 border border-warning/50 rounded-full font-inter text-xs font-semibold text-warning pointer-events-none whitespace-nowrap backdrop-blur-sm">
                         ⚠ {t('offsideWarning')}
+                    </div>
+                )}
+
+                {/* §12: keyboard-shortcuts tooltip ("?") */}
+                {keyboardNav && (
+                    <div className="absolute top-2 right-2 z-40">
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setShortcutsOpen(o => !o) }}
+                            aria-label={t('shortcuts.buttonLabel')}
+                            aria-expanded={shortcutsOpen}
+                            className="w-6 h-6 flex items-center justify-center rounded-full bg-bg-secondary/80 border border-border-subtle text-fg-muted hover:text-fg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green backdrop-blur-sm"
+                        >
+                            <HelpCircle size={14} strokeWidth={2} aria-hidden="true" />
+                        </button>
+                        {shortcutsOpen && (
+                            <div
+                                className="absolute top-full right-0 mt-1 z-50 w-max max-w-[220px] bg-bg-secondary border border-border-subtle rounded-md shadow-xl p-2.5 pointer-events-auto"
+                                onClick={e => e.stopPropagation()}
+                            >
+                                <p className="font-inter text-[11px] font-semibold text-fg-primary mb-1.5">{t('shortcuts.title')}</p>
+                                <ul className="font-mono text-[10px] text-fg-secondary leading-relaxed">
+                                    <li><kbd className="text-fg-primary">↑↓←→</kbd> {t('shortcuts.arrows')}</li>
+                                    <li><kbd className="text-fg-primary">Enter</kbd> {t('shortcuts.select')}</li>
+                                    <li><kbd className="text-fg-primary">M</kbd> {t('shortcuts.move')}</li>
+                                    <li><kbd className="text-fg-primary">P</kbd> {t('shortcuts.pass')}</li>
+                                    <li><kbd className="text-fg-primary">Esc</kbd> {t('shortcuts.cancel')}</li>
+                                </ul>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

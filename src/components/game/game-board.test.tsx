@@ -16,6 +16,7 @@ vi.mock('framer-motion', () => {
     motion: new Proxy({}, { get: (_t, tag: string) => make(tag) }),
     AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     MotionConfig: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    useReducedMotion: () => false,
   }
 })
 
@@ -64,5 +65,35 @@ describe('GameBoard', () => {
     const s = useGameStore.getState()
     expect(s.selectedPieceId).toBeNull()
     expect(s.interactionMode).toBeNull()
+  })
+})
+
+describe('GameBoard — keyboard shortcuts tooltip (§12)', () => {
+  it('shows a shortcuts button when keyboardNav is enabled', () => {
+    useGameStore.setState({ boardState: getInitialBoardState('white') })
+    render(<GameBoard userSide="white" />)
+    expect(screen.getByRole('button', { name: 'shortcuts.buttonLabel' })).toBeInTheDocument()
+  })
+
+  it('does not show a shortcuts button when keyboardNav is disabled', () => {
+    useGameStore.setState({ boardState: getInitialBoardState('white') })
+    render(<GameBoard userSide="white" keyboardNav={false} />)
+    expect(screen.queryByRole('button', { name: 'shortcuts.buttonLabel' })).not.toBeInTheDocument()
+  })
+
+  it('reveals the shortcut list on click and hides it again on a second click', () => {
+    useGameStore.setState({ boardState: getInitialBoardState('white') })
+    render(<GameBoard userSide="white" />)
+
+    expect(screen.queryByText('shortcuts.title')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'shortcuts.buttonLabel' }))
+    expect(screen.getByText('shortcuts.title')).toBeInTheDocument()
+    expect(screen.getByText('shortcuts.move')).toBeInTheDocument()
+    expect(screen.getByText('shortcuts.pass')).toBeInTheDocument()
+    expect(screen.getByText('shortcuts.cancel')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'shortcuts.buttonLabel' }))
+    expect(screen.queryByText('shortcuts.title')).not.toBeInTheDocument()
   })
 })
