@@ -39,12 +39,28 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
     const [cursor, setCursor] = useState<Position | null>(null)
     const [disambiguateAt, setDisambiguateAt] = useState<Position | null>(null)
     const [shortcutsOpen, setShortcutsOpen] = useState(false)
+    const shortcutsRef = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+        if (!shortcutsOpen) return
+        const onPointerDown = (e: MouseEvent) => {
+            if (shortcutsRef.current && !shortcutsRef.current.contains(e.target as Node)) {
+                setShortcutsOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', onPointerDown)
+        return () => document.removeEventListener('mousedown', onPointerDown)
+    }, [shortcutsOpen])
     const [invalidClickAt, setInvalidClickAt] = useState<(Position & { nonce: number }) | null>(null)
+    const invalidClickNonceRef = useRef(0)
+    const triggerInvalidClickShake = (x: number, y: number) => {
+        invalidClickNonceRef.current += 1
+        setInvalidClickAt({ x, y, nonce: invalidClickNonceRef.current })
+    }
     const [hoveredPassAt, setHoveredPassAt] = useState<Position | null>(null)
 
     useEffect(() => {
         if (!invalidClickAt) return
-        const id = setTimeout(() => setInvalidClickAt(null), 150)
+        const id = setTimeout(() => setInvalidClickAt(null), 100)
         return () => clearTimeout(id)
     }, [invalidClickAt])
 
@@ -63,8 +79,15 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
     useEffect(() => {
         const prevTurn = prevTurnRef.current
         prevTurnRef.current = boardState?.turn
-        if (!boardState || prefersReducedMotion || userSide === null) return
-        if (prevTurn === boardState.turn || boardState.turn !== userSide) return
+        if (!boardState || prevTurn === boardState.turn) return
+
+        // Turn moved on again before a replay finished (e.g. a very fast
+        // opponent turn) — the in-flight replay is now stale, drop it.
+        if (boardState.turn !== userSide) {
+            setReplay(null)
+            return
+        }
+        if (prefersReducedMotion || userSide === null) return
 
         const lastEntry = boardState.moveHistory.at(-1)
         if (!lastEntry) return
@@ -72,8 +95,7 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
             m => m.turnNumber === lastEntry.turnNumber && m.pieceSide !== userSide,
         )
         if (steps.length > 1) setReplay({ steps, index: 0 })
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [boardState?.turn])
+    }, [boardState, userSide, prefersReducedMotion])
 
     useEffect(() => {
         if (!replay) return
@@ -148,14 +170,20 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
         isInEnemyArea(ballCarrier.pos, ballCarrier.side)
 
     // §16: pass-trajectory preview — dashed line from the ball carrier to the
-    // hovered valid-pass square, red if an opposing piece sits on the path.
+    // hovered valid-pass square, red if an opposing piece would intercept it.
+    // Mirrors applyPass's own rules (game-engine.ts): the path INCLUDES the
+    // destination (an enemy sitting there still intercepts/scores), and a
+    // knight's pass only ever checks the destination — no traversal, since a
+    // knight throw doesn't travel the straight/diagonal line getPath assumes.
     const passCarrier = boardState.pieces.find(p => p.id === selectedPieceId && boardState.ball.holderId === p.id) ?? null
-    const trajectoryPath = (hoveredPassAt && passCarrier) ? getPath(passCarrier.pos, hoveredPassAt) : null
+    const trajectoryPath = (hoveredPassAt && passCarrier)
+        ? (passCarrier.type === 'knight' ? [hoveredPassAt] : getPath(passCarrier.pos, hoveredPassAt))
+        : null
     const trajectoryIntercepted = !!(trajectoryPath && passCarrier && trajectoryPath
-        .slice(0, -1)
         .some(sq => boardState.pieces.some(p => p.pos.x === sq.x && p.pos.y === sq.y && p.side !== passCarrier.side)))
 
     const handleSquareClick = (x: number, y: number) => {
+        if (replay) return // §4: don't act while the opponent-turn replay is playing
         setCursor(null)
         const isValidMove = validMoves.some(m => m.x === x && m.y === y)
         const isValidPass = validPasses.some(p => p.x === x && p.y === y)
@@ -167,14 +195,16 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
         if (isValidMove && selectedPieceId) {
             movePiece(selectedPieceId, { x, y })
             setDisambiguateAt(null)
+            setInvalidClickAt(null)
         } else if (isValidPass) {
             passBall({ x, y })
             setDisambiguateAt(null)
+            setInvalidClickAt(null)
         } else {
             // §16: subtle shake when a piece is selected but the target square
             // isn't a legal move/pass — no-op clicks on empty board stay silent.
             if (selectedPieceId) {
-                setInvalidClickAt({ x, y, nonce: Date.now() })
+                triggerInvalidClickShake(x, y)
             }
             setDisambiguateAt(null)
         }
@@ -182,6 +212,7 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
 
     const handlePieceClick = (pieceId: string, x: number, y: number, e: React.MouseEvent) => {
         e.stopPropagation()
+        if (replay) return // §4: don't act while the opponent-turn replay is playing
         const pieceAt = boardState.pieces.find(p => p.id === pieceId)
         if (!pieceAt) return
 
@@ -196,6 +227,13 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
             } else {
                 setSelectedPieceId(pieceAt.id)
             }
+            setDisambiguateAt(null)
+            setInvalidClickAt(null)
+        } else if (selectedPieceId) {
+            // §16: clicking an occupied square (own non-selectable or opponent
+            // piece) that isn't a legal target is just as "invalid" as clicking
+            // an illegal empty square — keep the feedback consistent.
+            triggerInvalidClickShake(x, y)
             setDisambiguateAt(null)
         }
     }
@@ -215,7 +253,7 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (!keyboardNav) return
+        if (!keyboardNav || replay) return
         const step = (dx: number, dy: number) => {
             e.preventDefault()
             setCursor(c => {
@@ -249,7 +287,9 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                 }
                 break
             case 'Escape':
-                if (disambiguateAt) {
+                if (shortcutsOpen) {
+                    setShortcutsOpen(false)
+                } else if (disambiguateAt) {
                     setDisambiguateAt(null)
                 } else {
                     setSelectedPieceId(null)
@@ -409,7 +449,7 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                             y1={ROWS - 1 - passCarrier.pos.y + 0.5}
                             x2={hoveredPassAt.x + 0.5}
                             y2={ROWS - 1 - hoveredPassAt.y + 0.5}
-                            stroke={trajectoryIntercepted ? '#E54545' : '#38bdf8'}
+                            stroke={trajectoryIntercepted ? 'var(--danger)' : 'var(--pass-highlight)'}
                             strokeWidth="0.08"
                             strokeDasharray="0.15 0.1"
                             strokeLinecap="round"
@@ -498,7 +538,7 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                             aria-hidden="true"
                             initial={false}
                             animate={prefersReducedMotion ? { opacity: [0.9, 0] } : { x: [0, -3, 3, -3, 3, 0] }}
-                            transition={{ duration: 0.15 }}
+                            transition={{ duration: 0.08 }}
                             style={{
                                 position: 'absolute',
                                 left: `${(invalidClickAt.x / COLS) * 100}%`,
@@ -518,17 +558,23 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                     </div>
                 )}
 
-                {/* §12: keyboard-shortcuts tooltip ("?") */}
+                {/* §12: keyboard-shortcuts tooltip ("?") — desktop only: arrow-key
+                    navigation isn't a touch affordance, and keyboardNav defaults
+                    true package-wide, so this can't just gate on that prop alone. */}
                 {keyboardNav && (
-                    <div className="absolute top-2 right-2 z-40">
+                    <div
+                        ref={shortcutsRef}
+                        className="hidden md:block absolute top-2 right-2 z-40"
+                        onKeyDown={e => e.stopPropagation()}
+                    >
                         <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setShortcutsOpen(o => !o) }}
                             aria-label={t('shortcuts.buttonLabel')}
                             aria-expanded={shortcutsOpen}
-                            className="w-6 h-6 flex items-center justify-center rounded-full bg-bg-secondary/80 border border-border-subtle text-fg-muted hover:text-fg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green backdrop-blur-sm"
+                            className="w-11 h-11 flex items-center justify-center rounded-full bg-bg-secondary/80 border border-border-subtle text-fg-muted hover:text-fg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green backdrop-blur-sm"
                         >
-                            <HelpCircle size={14} strokeWidth={2} aria-hidden="true" />
+                            <HelpCircle size={16} strokeWidth={2} aria-hidden="true" />
                         </button>
                         {shortcutsOpen && (
                             <div

@@ -107,6 +107,31 @@ describe('GameBoard — keyboard shortcuts tooltip (§12)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'shortcuts.buttonLabel' }))
     expect(screen.queryByText('shortcuts.title')).not.toBeInTheDocument()
   })
+
+  it('closes on Escape', () => {
+    useGameStore.setState({ boardState: getInitialBoardState('white') })
+    render(<GameBoard userSide="white" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'shortcuts.buttonLabel' }))
+    expect(screen.getByText('shortcuts.title')).toBeInTheDocument()
+
+    fireEvent.keyDown(screen.getByRole('application'), { key: 'Escape' })
+    expect(screen.queryByText('shortcuts.title')).not.toBeInTheDocument()
+  })
+
+  it('closes on an outside click (e.g. clicking a board square)', () => {
+    vi.mocked(getValidMoves).mockReturnValue([])
+    vi.mocked(getValidPasses).mockReturnValue([])
+    useGameStore.setState({ boardState: getInitialBoardState('white') })
+    const { container } = render(<GameBoard userSide="white" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'shortcuts.buttonLabel' }))
+    expect(screen.getByText('shortcuts.title')).toBeInTheDocument()
+
+    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    fireEvent.mouseDown(squares[0])
+    expect(screen.queryByText('shortcuts.title')).not.toBeInTheDocument()
+  })
 })
 
 describe('GameBoard — invalid-action shake (§16)', () => {
@@ -132,6 +157,21 @@ describe('GameBoard — invalid-action shake (§16)', () => {
     act(() => { vi.advanceTimersByTime(200) })
     expect(screen.queryByTestId('invalid-action-shake')).not.toBeInTheDocument()
 
+    vi.useRealTimers()
+  })
+
+  it('also shakes when clicking an occupied square that is not a legal target (e.g. an unreachable enemy piece)', () => {
+    vi.useFakeTimers()
+    const boardState = getInitialBoardState('white')
+    const blackPieceIndex = boardState.pieces.findIndex(p => p.side === 'black')
+    useGameStore.setState({ boardState, selectedPieceId: 'white_rook_0_1' })
+    const { container } = render(<GameBoard userSide="white" />)
+
+    const blackPieceEl = container.querySelectorAll('.z-10')[blackPieceIndex]
+    expect(blackPieceEl).toBeTruthy()
+    fireEvent.click(blackPieceEl)
+
+    expect(screen.getByTestId('invalid-action-shake')).toBeInTheDocument()
     vi.useRealTimers()
   })
 
@@ -174,7 +214,7 @@ describe('GameBoard — pass trajectory preview (§16)', () => {
     fireEvent.mouseEnter(squares[squareIndex(3, 5)])
 
     const line = screen.getByTestId('pass-trajectory-line')
-    expect(line).toHaveAttribute('stroke', '#38bdf8')
+    expect(line).toHaveAttribute('stroke', 'var(--pass-highlight)')
   })
 
   it('shows a danger-colored line when an enemy piece sits on the path', () => {
@@ -186,7 +226,7 @@ describe('GameBoard — pass trajectory preview (§16)', () => {
     fireEvent.mouseEnter(squares[squareIndex(3, 5)])
 
     const line = screen.getByTestId('pass-trajectory-line')
-    expect(line).toHaveAttribute('stroke', '#E54545')
+    expect(line).toHaveAttribute('stroke', 'var(--danger)')
   })
 
   it('hides the line on mouse leave', () => {
@@ -200,6 +240,29 @@ describe('GameBoard — pass trajectory preview (§16)', () => {
 
     fireEvent.mouseLeave(target)
     expect(screen.queryByTestId('pass-trajectory-line')).not.toBeInTheDocument()
+  })
+
+  it('flags danger when the enemy sits exactly on the destination square (applyPass walks the full path, incl. destination)', () => {
+    const interceptor = { id: 'black_interceptor', type: 'rook' as const, side: 'black' as const, pos: { x: 3, y: 5 }, hasMovedThisTurn: false }
+    setUpBallCarrierAt(1, 5, [interceptor])
+    const { container } = render(<GameBoard userSide="white" />)
+
+    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    fireEvent.mouseEnter(squares[squareIndex(3, 5)])
+
+    expect(screen.getByTestId('pass-trajectory-line')).toHaveAttribute('stroke', 'var(--danger)')
+  })
+
+  it('ignores pieces on the straight-line path for a knight carrier (applyPass only checks the destination for knights)', () => {
+    const enemyOnPath = { id: 'black_on_path', type: 'rook' as const, side: 'black' as const, pos: { x: 2, y: 5 }, hasMovedThisTurn: false }
+    const carrier = setUpBallCarrierAt(1, 5, [enemyOnPath])
+    carrier.type = 'knight'
+    const { container } = render(<GameBoard userSide="white" />)
+
+    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    fireEvent.mouseEnter(squares[squareIndex(3, 5)])
+
+    expect(screen.getByTestId('pass-trajectory-line')).toHaveAttribute('stroke', 'var(--pass-highlight)')
   })
 })
 
@@ -253,6 +316,33 @@ describe('GameBoard — sequential replay of a multi-action opponent turn (§4)'
     expect(hasHighlight(squares, 4, 6)).toBe(true)
     expect(hasHighlight(squares, 5, 6)).toBe(true)
     expect(hasHighlight(squares, 2, 6)).toBe(false)
+
+    vi.useRealTimers()
+  })
+
+  it('ignores clicks while the replay is in progress', () => {
+    vi.useFakeTimers()
+    const boardState = opponentTurnBoardState()
+    useGameStore.setState({ boardState, selectedPieceId: null })
+    const { container } = render(<GameBoard userSide="white" />)
+
+    act(() => { useGameStore.setState({ boardState: finishedOpponentTurnBoardState(boardState) }) })
+
+    // A white piece is now selectable (it's white's turn) — but the replay
+    // (triggered by the turn flip above) should still be mid-flight, so
+    // clicking it must not select it.
+    const ownPieceIndex = finishedOpponentTurnBoardState(boardState).pieces.findIndex(p => p.side === 'white')
+    fireEvent.click(container.querySelectorAll('.z-10')[ownPieceIndex])
+
+    expect(useGameStore.getState().selectedPieceId).toBeNull()
+
+    // Once the replay finishes, clicks work again. Re-query the piece node
+    // after the timer advances — each replay step re-render remounts the
+    // (mocked) motion.div tree, so a DOM reference taken before now is stale.
+    act(() => { vi.advanceTimersByTime(350) })
+    act(() => { vi.advanceTimersByTime(350) })
+    fireEvent.click(container.querySelectorAll('.z-10')[ownPieceIndex])
+    expect(useGameStore.getState().selectedPieceId).not.toBeNull()
 
     vi.useRealTimers()
   })

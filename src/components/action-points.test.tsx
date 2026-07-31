@@ -38,4 +38,23 @@ describe('ActionPoints — AP-spend micro-interaction (Story 4.2, plan §16)', (
     rerender(<ActionPoints total={5} remaining={3} />)
     expect(screen.getByTestId('ap-pip-2')).not.toHaveAttribute('data-spent', 'true')
   })
+
+  it('marks every pip that dropped when remaining falls by more than one at once (forced turn end)', () => {
+    const { rerender } = render(<ActionPoints total={5} remaining={3} />)
+    rerender(<ActionPoints total={5} remaining={0} />)
+
+    expect(screen.getByTestId('ap-pip-0')).toHaveAttribute('data-spent', 'true')
+    expect(screen.getByTestId('ap-pip-1')).toHaveAttribute('data-spent', 'true')
+    expect(screen.getByTestId('ap-pip-2')).toHaveAttribute('data-spent', 'true')
+  })
+
+  it('clears the pending pop immediately if remaining rises again before the timeout fires (rollback)', () => {
+    vi.useFakeTimers()
+    const { rerender } = render(<ActionPoints total={5} remaining={3} />)
+    rerender(<ActionPoints total={5} remaining={2} />)
+    expect(screen.getByTestId('ap-pip-2')).toHaveAttribute('data-spent', 'true')
+
+    rerender(<ActionPoints total={5} remaining={3} />)
+    expect(screen.getByTestId('ap-pip-2')).not.toHaveAttribute('data-spent', 'true')
+  })
 })
