@@ -1,6 +1,6 @@
 {
   "name": "@scriptonita/chess-football-ui",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Shared, framework-agnostic React UI for Chess.Football: board, pieces, scoreboard, controls and the game store. Consumed by the Next.js app and the CrazyGames Vite SPA.",
   "type": "module",
   "license": "MIT",
