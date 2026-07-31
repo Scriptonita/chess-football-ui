@@ -118,7 +118,7 @@ function PlayerInfo({ name, team, avatarUrl, isActive, actionPoints, maxActionPo
         <div className={cn('flex items-center gap-1', align === 'right' && 'flex-row-reverse')}>
           <span className="font-mono text-[10px] text-fg-muted uppercase">{team}</span>
           {isActive && (
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-green animate-pulse" aria-hidden="true" />
+            <span className="w-1.5 h-1.5 rounded-full bg-accent-green animate-pulse motion-reduce:animate-none" aria-hidden="true" />
           )}
         </div>
         <ActionPoints

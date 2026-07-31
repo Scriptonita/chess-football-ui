@@ -87,7 +87,7 @@ export default function GamePiece({ piece, isSelected, hasBall, onClick }: GameP
             onClick={onClick}
             style={style}
             className={cn(
-                "relative w-[88%] h-[88%] flex items-center justify-center rounded-full cursor-pointer z-10 transition-transform",
+                "relative w-[88%] h-[88%] flex items-center justify-center rounded-full cursor-pointer z-10 transition-transform motion-reduce:transition-none",
                 isSelected && "ring-4 ring-primary scale-110 z-30",
                 piece.hasMovedThisTurn && "opacity-70"
             )}
@@ -100,7 +100,7 @@ export default function GamePiece({ piece, isSelected, hasBall, onClick }: GameP
 
 
             {isSelected && (
-                <div className="absolute inset-0 rounded-full animate-pulse ring-2 ring-yellow-400 ring-offset-2 ring-offset-transparent" />
+                <div className="absolute inset-0 rounded-full animate-pulse motion-reduce:animate-none ring-2 ring-yellow-400 ring-offset-2 ring-offset-transparent" />
             )}
         </div>
     )
