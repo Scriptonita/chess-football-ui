@@ -2,10 +2,13 @@ import { useGameStore } from '../../store/use-game-store'
 import { getValidMoves, getValidPasses, getPath, isInEnemyArea } from '@scriptonita/chess-football-engine'
 import { cn } from '../../lib/utils'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
-import GamePiece, { PieceIcon, WHITE_PIECE_STYLE, BLACK_PIECE_STYLE } from './game-piece'
+import GamePiece from './game-piece'
+import { BallHolderChip } from './ball-holder-chip'
+import { KeyboardShortcutsList } from './keyboard-shortcuts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Side, Position, MoveHistoryEntry } from '@scriptonita/chess-football-engine'
 import { Football } from './football'
+import { GrassOverlay, PitchMarkings, pitchSquareClass } from './pitch'
 import { FILE_LABELS, RANK_LABELS } from '@scriptonita/chess-football-engine'
 import { Move, HelpCircle } from 'lucide-react'
 import { useGameT } from '../../i18n'
@@ -16,6 +19,12 @@ interface GameBoardProps {
     showCoordinates?: boolean
     /** When true, the board is keyboard-operable (arrows move a cursor, Enter acts). */
     keyboardNav?: boolean
+    /**
+     * Desktop-only row above the grid with the ball-holder chip and the keyboard
+     * shortcuts button. Pass `false` when the app renders `BallHolderChip` and
+     * `KeyboardShortcutsList` itself (e.g. in a side panel) so nothing is shown twice.
+     */
+    toolbar?: boolean
 }
 
 // Board dimensions
@@ -24,7 +33,23 @@ const ROWS = 12
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
 
-export default function GameBoard({ userSide, showCoordinates = false, keyboardNav = true }: GameBoardProps) {
+// Pieces and the ball are positioned with translate transforms instead of
+// animating `left`/`top`: each wrapper is exactly one cell wide/tall, so a
+// percentage translate of N×100% lands on cell N, and the animation runs on the
+// compositor (no layout/paint per frame) — that is what makes the slide smooth.
+const cellX = (x: number) => `${x * 100}%`
+const cellY = (y: number) => `${(ROWS - 1 - y) * 100}%`
+
+// Critically-damped springs (ratio ≈ 1.0): a firm push-off, a long glide and
+// a soft landing with no bounce — a chip sliding across turf, not a rubber
+// ball. Settles in roughly half a second regardless of distance, so a long
+// rook run still reads as one motion. A carried ball uses the piece's curve
+// so it never drifts ahead of or behind its holder; a free ball (pass) is
+// lighter and snappier.
+const PIECE_SLIDE = { type: 'spring' as const, stiffness: 190, damping: 28, mass: 1 }
+const BALL_SLIDE  = { type: 'spring' as const, stiffness: 300, damping: 26, mass: 0.6 }
+
+export default function GameBoard({ userSide, showCoordinates = false, keyboardNav = true, toolbar = true }: GameBoardProps) {
     const t = useGameT()
     const prefersReducedMotion = useReducedMotion()
     const {
@@ -57,6 +82,17 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
         setInvalidClickAt({ x, y, nonce: invalidClickNonceRef.current })
     }
     const [hoveredPassAt, setHoveredPassAt] = useState<Position | null>(null)
+
+    // Pieces currently travelling between squares (framer-motion drives the
+    // slide; this only toggles the lift/shadow cue on GamePiece).
+    const [movingIds, setMovingIds] = useState<ReadonlySet<string>>(() => new Set())
+    const setMoving = (id: string, moving: boolean) =>
+        setMovingIds(prev => {
+            if (prev.has(id) === moving) return prev
+            const next = new Set(prev)
+            if (moving) next.add(id); else next.delete(id)
+            return next
+        })
 
     useEffect(() => {
         if (!invalidClickAt) return
@@ -126,11 +162,6 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
     }, [boardState, selectedPieceId])
 
     if (!boardState) return null
-
-    // §12b: who has the ball right now — surfaced in the desktop toolbar so it
-    // doesn't rely on the subtle per-piece ring alone (that ring stays, this is
-    // additive: a persistent, always-visible answer to "whose ball is it").
-    const ballHolderPiece = boardState.pieces.find(p => p.id === boardState.ball.holderId) ?? null
 
     const lastMove = boardState.lastMove
     const ball = boardState.ball
@@ -308,10 +339,6 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
         const squares = []
         for (let y = ROWS - 1; y >= 0; y--) {
             for (let x = 0; x < COLS; x++) {
-                const isGoalArea =
-                    (x >= 2 && x <= 6) && ((y >= 0 && y <= 1) || (y >= 10 && y <= 11))
-                const isEven = (x + y) % 2 === 0
-
                 const isValidMove = validMoves.some(m => m.x === x && m.y === y)
                 const isValidPass = validPasses.some(p => p.x === x && p.y === y)
                 const isAmbiguous = isValidMove && isValidPass
@@ -340,9 +367,8 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                         onMouseEnter={() => { if (isValidPass) setHoveredPassAt({ x, y }) }}
                         onMouseLeave={() => setHoveredPassAt(null)}
                         className={cn(
-                            "relative aspect-square w-full flex items-center justify-center cursor-pointer",
-                            isEven ? "bg-field-green-1" : "bg-field-green-2",
-                            isGoalArea && "bg-[#1a3a18] ring-1 ring-inset ring-emerald-500/30",
+                            pitchSquareClass(x, y),
+                            "flex items-center justify-center cursor-pointer",
                             !isValidMove && !isValidPass && isLastMove && "bg-last-move-highlight/20",
                             // §8: pulsing warning ring on enemy goal area
                             isOffsideRisk && isEnemyGoalArea && !isValidMove && !isValidPass && "ring-2 ring-inset ring-warning/60",
@@ -427,84 +453,62 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                 : {})}
         >
             {/* §12: desktop-only board toolbar — sits in its own row above the grid so
-                nothing here ever overlaps a playable square (was previously absolutely
-                positioned over the top-right cell). Left: persistent ball-holder chip.
-                Right: keyboard-shortcuts legend, when the board is keyboard-operable. */}
-            <div className="hidden md:flex items-center justify-between gap-2 px-2.5 py-1">
-                <div className="flex items-center gap-1.5 min-h-[1.75rem]" aria-live="polite">
-                    {ballHolderPiece && (
-                        <>
-                            <div
-                                style={ballHolderPiece.side === 'white' ? WHITE_PIECE_STYLE : BLACK_PIECE_STYLE}
-                                className="relative w-7 h-7 flex items-center justify-center rounded-full shrink-0"
+                nothing here ever overlaps a playable square. Left: persistent ball-holder
+                chip. Right: keyboard-shortcuts legend, when the board is keyboard-operable.
+                Apps with a side panel can opt out (toolbar={false}) and place both
+                components themselves. */}
+            {toolbar && (
+                <div className="hidden md:flex items-center justify-between gap-2 px-2.5 py-1" data-testid="board-toolbar">
+                    <BallHolderChip />
+
+                    {keyboardNav && (
+                        <div
+                            ref={shortcutsRef}
+                            className="relative"
+                            onKeyDown={e => e.stopPropagation()}
+                        >
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setShortcutsOpen(o => !o) }}
+                                aria-label={t('shortcuts.buttonLabel')}
+                                aria-expanded={shortcutsOpen}
+                                className="w-8 h-8 flex items-center justify-center rounded-full bg-bg-secondary/80 border border-border-subtle text-fg-muted hover:text-fg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
                             >
-                                <PieceIcon type={ballHolderPiece.type} side={ballHolderPiece.side} />
-                                <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 flex items-center justify-center rounded-full bg-bg-secondary border border-border-subtle">
-                                    <div className="w-2.5 h-2.5"><Football /></div>
+                                <HelpCircle size={16} strokeWidth={2} aria-hidden="true" />
+                            </button>
+                            {shortcutsOpen && (
+                                <div
+                                    className="absolute top-full right-0 mt-1 z-50 w-max max-w-[220px] bg-bg-secondary border border-border-subtle rounded-md shadow-xl p-2.5 pointer-events-auto"
+                                    onClick={e => e.stopPropagation()}
+                                >
+                                    <p className="font-inter text-[11px] font-semibold text-fg-primary mb-1.5">{t('shortcuts.title')}</p>
+                                    <KeyboardShortcutsList />
                                 </div>
-                            </div>
-                            <span className="font-inter text-[11px] text-fg-secondary">
-                                {t('ballHolder')}: {t(`pieces.${ballHolderPiece.type}`)}
-                            </span>
-                        </>
+                            )}
+                        </div>
                     )}
                 </div>
-
-                {keyboardNav && (
-                    <div
-                        ref={shortcutsRef}
-                        className="relative"
-                        onKeyDown={e => e.stopPropagation()}
-                    >
-                        <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setShortcutsOpen(o => !o) }}
-                            aria-label={t('shortcuts.buttonLabel')}
-                            aria-expanded={shortcutsOpen}
-                            className="w-8 h-8 flex items-center justify-center rounded-full bg-bg-secondary/80 border border-border-subtle text-fg-muted hover:text-fg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
-                        >
-                            <HelpCircle size={16} strokeWidth={2} aria-hidden="true" />
-                        </button>
-                        {shortcutsOpen && (
-                            <div
-                                className="absolute top-full right-0 mt-1 z-50 w-max max-w-[220px] bg-bg-secondary border border-border-subtle rounded-md shadow-xl p-2.5 pointer-events-auto"
-                                onClick={e => e.stopPropagation()}
-                            >
-                                <p className="font-inter text-[11px] font-semibold text-fg-primary mb-1.5">{t('shortcuts.title')}</p>
-                                <ul className="font-mono text-[10px] text-fg-secondary leading-relaxed">
-                                    <li><kbd className="text-fg-primary">↑↓←→</kbd> {t('shortcuts.arrows')}</li>
-                                    <li><kbd className="text-fg-primary">Enter</kbd> {t('shortcuts.select')}</li>
-                                    <li><kbd className="text-fg-primary">M</kbd> {t('shortcuts.move')}</li>
-                                    <li><kbd className="text-fg-primary">P</kbd> {t('shortcuts.pass')}</li>
-                                    <li><kbd className="text-fg-primary">Esc</kbd> {t('shortcuts.cancel')}</li>
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
+            )}
 
             <div className="relative" style={{ containerType: 'inline-size' }}>
                 <div className="grid grid-cols-9 gap-[1px]">
                     {renderSquares()}
                 </div>
 
+                {/* Turf grain + stadium light: decorative, click-through. */}
+                <GrassOverlay />
+
+                {/* Chalk pitch lines — static, so the browser caches the filter as its own layer. */}
+                <PitchMarkings />
+
+                {/* Dynamic board-space overlays live in their own <svg> so hover
+                    repaints never re-run the chalk filter above. */}
                 <svg
                     viewBox="0 0 9 12"
                     preserveAspectRatio="none"
                     className="absolute inset-0 w-full h-full pointer-events-none"
                     aria-hidden="true"
                 >
-                    <rect x="2" y="0" width="5" height="2" fill="none" stroke="white" strokeOpacity="0.3" strokeWidth="0.05" />
-                    <rect x="2" y="10" width="5" height="2" fill="none" stroke="white" strokeOpacity="0.3" strokeWidth="0.05" />
-                    <line x1="0" y1="6" x2="9" y2="6" stroke="white" strokeOpacity="0.35" strokeWidth="0.05" />
-                    <circle cx="4.5" cy="6" r="1.5" fill="none" stroke="white" strokeOpacity="0.3" strokeWidth="0.05" />
-                    <circle cx="4.5" cy="6" r="0.12" fill="white" fillOpacity="0.5" />
-                    <circle cx="4.5" cy="1.5" r="0.1" fill="white" fillOpacity="0.5" />
-                    <circle cx="4.5" cy="10.5" r="0.1" fill="white" fillOpacity="0.5" />
-                    <path d="M 3.086,2 A 1.5,1.5 0 0 0 5.914,2" fill="none" stroke="white" strokeOpacity="0.3" strokeWidth="0.05" />
-                    <path d="M 3.086,10 A 1.5,1.5 0 0 1 5.914,10" fill="none" stroke="white" strokeOpacity="0.3" strokeWidth="0.05" />
-
                     {hoveredPassAt && passCarrier && (
                         <line
                             data-testid="pass-trajectory-line"
@@ -520,27 +524,29 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                     )}
                 </svg>
 
-                <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute inset-0 pointer-events-none" data-testid="pieces-layer">
                     <AnimatePresence mode="sync">
                         {boardState.pieces.map(piece => {
                             const isPickupCarrier = pickupCarrierId === piece.id
                             const pieceTransition = isPickupCarrier
                                 ? { duration: PICKUP_DURATION, ease: 'linear' as const }
-                                : { type: 'spring' as const, stiffness: 200, damping: 25, mass: 1 }
+                                : PIECE_SLIDE
                             return (
                                 <motion.div
                                     key={piece.id}
-                                    layout
+                                    data-piece-id={piece.id}
                                     initial={false}
-                                    animate={{
-                                        left: `${(piece.pos.x / COLS) * 100}%`,
-                                        top: `${((ROWS - 1 - piece.pos.y) / ROWS) * 100}%`,
-                                    }}
+                                    animate={{ x: cellX(piece.pos.x), y: cellY(piece.pos.y) }}
                                     transition={pieceTransition}
+                                    onAnimationStart={() => setMoving(piece.id, true)}
+                                    onAnimationComplete={() => setMoving(piece.id, false)}
                                     style={{
                                         position: 'absolute',
+                                        left: 0,
+                                        top: 0,
                                         width: `${100 / COLS}%`,
                                         height: `${100 / ROWS}%`,
+                                        willChange: 'transform',
                                     }}
                                     className="flex items-center justify-center pointer-events-auto"
                                 >
@@ -548,6 +554,7 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                                         piece={piece}
                                         isSelected={selectedPieceId === piece.id}
                                         hasBall={boardState.ball.holderId === piece.id}
+                                        isMoving={movingIds.has(piece.id)}
                                         onClick={(e: React.MouseEvent) => handlePieceClick(piece.id, piece.pos.x, piece.pos.y, e)}
                                     />
                                 </motion.div>
@@ -556,23 +563,23 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                     </AnimatePresence>
 
                     {(() => {
-                        const targetX = (ball.pos.x / COLS) * 100
-                        const targetY = ((ROWS - 1 - ball.pos.y) / ROWS) * 100
+                        const targetX = cellX(ball.pos.x)
+                        const targetY = cellY(ball.pos.y)
                         let animate: any
                         let transition: any
                         if (isPickupOnMove && prevBall) {
-                            const prevX = (prevBall.pos.x / COLS) * 100
-                            const prevY = ((ROWS - 1 - prevBall.pos.y) / ROWS) * 100
+                            const prevX = cellX(prevBall.pos.x)
+                            const prevY = cellY(prevBall.pos.y)
                             const pulseStart = Math.max(0.05, pickupProportion - 0.06)
                             animate = {
-                                left: [`${prevX}%`, `${prevX}%`, `${prevX}%`, `${targetX}%`],
-                                top:  [`${prevY}%`, `${prevY}%`, `${prevY}%`, `${targetY}%`],
+                                x: [prevX, prevX, prevX, targetX],
+                                y: [prevY, prevY, prevY, targetY],
                                 scale: [1, 1, 1.35, 1],
                             }
                             transition = { duration: PICKUP_DURATION, times: [0, pulseStart, pickupProportion, 1], ease: 'linear' }
                         } else {
-                            animate = { left: `${targetX}%`, top: `${targetY}%`, scale: 1 }
-                            transition = { type: 'spring', stiffness: 300, damping: 30, mass: 0.5 }
+                            animate = { x: targetX, y: targetY, scale: 1 }
+                            transition = ball.holderId ? PIECE_SLIDE : BALL_SLIDE
                         }
                         return (
                             <motion.div
@@ -582,9 +589,12 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                                 transition={transition}
                                 style={{
                                     position: 'absolute',
+                                    left: 0,
+                                    top: 0,
                                     width: `${100 / COLS}%`,
                                     height: `${100 / ROWS}%`,
                                     zIndex: 50,
+                                    willChange: 'transform',
                                 }}
                                 className="flex items-center justify-center pointer-events-none"
                             >
