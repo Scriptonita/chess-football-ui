@@ -363,3 +363,52 @@ describe('GameBoard — sequential replay of a multi-action opponent turn (§4)'
     vi.mocked(useReducedMotion).mockReturnValue(false)
   })
 })
+
+describe('GameBoard — pitch surface', () => {
+  it('layers the grass grain and chalk markings between the squares and the pieces', () => {
+    useGameStore.setState({ boardState: getInitialBoardState('white') })
+    render(<GameBoard userSide="white" />)
+    const board = screen.getByRole('application')
+    const grass = board.querySelector('[data-testid="grass-overlay"]') as HTMLElement
+    const markings = board.querySelector('[data-testid="pitch-markings"]') as HTMLElement
+    const pieces = board.querySelector('[data-testid="pieces-layer"]') as HTMLElement
+    expect(grass).not.toBeNull()
+    expect(markings).not.toBeNull()
+    expect(pieces).not.toBeNull()
+    const order = Array.from(grass.parentElement!.children)
+    expect(order.indexOf(grass)).toBeLessThan(order.indexOf(markings))
+    expect(order.indexOf(markings)).toBeLessThan(order.indexOf(pieces))
+  })
+
+  it('positions pieces with GPU-friendly transforms (no left/top layout animation)', () => {
+    useGameStore.setState({ boardState: getInitialBoardState('white') })
+    render(<GameBoard userSide="white" />)
+    const pieces = screen.getByRole('application').querySelector('[data-testid="pieces-layer"]') as HTMLElement
+    const wrappers = pieces.querySelectorAll('[data-piece-id]')
+    expect(wrappers.length).toBe(getInitialBoardState('white').pieces.length)
+    wrappers.forEach(w => {
+      const el = w as HTMLElement
+      expect(el.style.willChange).toBe('transform')
+      expect(el.style.left).toBe('0px')
+      expect(el.style.top).toBe('0px')
+    })
+  })
+})
+
+describe('GameBoard — toolbar placement', () => {
+  it('renders the ball-holder chip and shortcuts button above the grid by default', () => {
+    useGameStore.setState({ boardState: getInitialBoardState('white') })
+    render(<GameBoard userSide="white" />)
+    expect(screen.getByRole('application').querySelector('[data-testid="board-toolbar"]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'shortcuts.buttonLabel' })).toBeInTheDocument()
+  })
+
+  it('omits the toolbar when the app places those controls elsewhere (toolbar={false})', () => {
+    useGameStore.setState({ boardState: getInitialBoardState('white') })
+    render(<GameBoard userSide="white" toolbar={false} />)
+    expect(screen.getByRole('application').querySelector('[data-testid="board-toolbar"]')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'shortcuts.buttonLabel' })).toBeNull()
+    // keyboard operation itself is unaffected
+    expect(screen.getByRole('application')).toHaveAttribute('tabindex', '0')
+  })
+})

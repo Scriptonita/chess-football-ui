@@ -8,9 +8,12 @@ export { default as GameControls } from './components/game/game-controls'
 export { SelectedPieceDetail } from './components/game/selected-piece-detail'
 export { MoveHistory } from './components/game/move-history'
 export { StaticGameBoard } from './components/game/static-game-board'
+export { GrassOverlay, PitchMarkings, PitchSurface, pitchSquareClass, isGoalAreaSquare, GOAL_AREA_SHADE_CLASS, PITCH_COLS, PITCH_ROWS } from './components/game/pitch'
 export { TurnBanner } from './components/game/turn-banner'
 export { EventToast } from './components/game/event-toast'
 export { MobileHistory } from './components/game/mobile-history'
+export { BallHolderChip } from './components/game/ball-holder-chip'
+export { KeyboardShortcutsList } from './components/game/keyboard-shortcuts'
 
 // ── UI primitives ─────────────────────────────────────────────────────────────
 export { ActionPoints } from './components/action-points'
