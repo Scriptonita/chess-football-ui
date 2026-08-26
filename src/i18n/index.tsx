@@ -19,6 +19,7 @@ export type GameTranslator = (key: string, values?: Record<string, unknown>) => 
 const STATIC_I18N_KEYS = [
   'actionPointsAriaLabel',
   'actionPointsShort',
+  'ballHolder',
   'endTurn',
   'endTurnConfirm',
   'endTurnConfirmDescription',

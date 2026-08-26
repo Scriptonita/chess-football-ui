@@ -33,7 +33,7 @@ const EMBOSS_FILTER: Record<Piece['side'], string> = {
     black: 'drop-shadow(0 -0.5px 0 rgba(255,255,255,0.3)) drop-shadow(0 1.25px 1.5px rgba(0,0,0,0.8))',
 }
 
-const PieceIcon = ({ type, side }: { type: Piece['type']; side: Piece['side'] }) => {
+export const PieceIcon = ({ type, side }: { type: Piece['type']; side: Piece['side'] }) => {
     const Icon = PIECE_ICON[type] ?? ShieldQuestion
     // Size scales with the board container width (cqw); clamp keeps the glyph
     // readable on small screens and avoids overflow on very large ones.
@@ -48,7 +48,7 @@ const PieceIcon = ({ type, side }: { type: Piece['type']; side: Piece['side'] })
 // 3D piece styling: radial gradient for top-left light source + layered
 // box-shadows (inner highlight, inner bottom shade, outer drop shadows) to
 // suggest a chip floating slightly above the board.
-const WHITE_PIECE_STYLE: React.CSSProperties = {
+export const WHITE_PIECE_STYLE: React.CSSProperties = {
     background: 'radial-gradient(circle at 30% 25%, #ffffff 0%, #f4f4f5 55%, #d4d4d8 100%)',
     boxShadow: [
         'inset 0 1.5px 1px rgba(255,255,255,0.95)',
@@ -60,7 +60,7 @@ const WHITE_PIECE_STYLE: React.CSSProperties = {
     color: '#09090b',
 }
 
-const BLACK_PIECE_STYLE: React.CSSProperties = {
+export const BLACK_PIECE_STYLE: React.CSSProperties = {
     background: 'radial-gradient(circle at 30% 25%, #52525b 0%, #1c1c1f 55%, #050507 100%)',
     boxShadow: [
         'inset 0 1.5px 1px rgba(255,255,255,0.22)',
