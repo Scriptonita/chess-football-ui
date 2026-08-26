@@ -2,7 +2,7 @@ import { useGameStore } from '../../store/use-game-store'
 import { getValidMoves, getValidPasses, getPath, isInEnemyArea } from '@scriptonita/chess-football-engine'
 import { cn } from '../../lib/utils'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
-import GamePiece from './game-piece'
+import GamePiece, { PieceIcon, WHITE_PIECE_STYLE, BLACK_PIECE_STYLE } from './game-piece'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Side, Position, MoveHistoryEntry } from '@scriptonita/chess-football-engine'
 import { Football } from './football'
@@ -126,6 +126,11 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
     }, [boardState, selectedPieceId])
 
     if (!boardState) return null
+
+    // §12b: who has the ball right now — surfaced in the desktop toolbar so it
+    // doesn't rely on the subtle per-piece ring alone (that ring stays, this is
+    // additive: a persistent, always-visible answer to "whose ball is it").
+    const ballHolderPiece = boardState.pieces.find(p => p.id === boardState.ball.holderId) ?? null
 
     const lastMove = boardState.lastMove
     const ball = boardState.ball
@@ -421,6 +426,64 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                 }
                 : {})}
         >
+            {/* §12: desktop-only board toolbar — sits in its own row above the grid so
+                nothing here ever overlaps a playable square (was previously absolutely
+                positioned over the top-right cell). Left: persistent ball-holder chip.
+                Right: keyboard-shortcuts legend, when the board is keyboard-operable. */}
+            <div className="hidden md:flex items-center justify-between gap-2 px-2.5 py-1">
+                <div className="flex items-center gap-1.5 min-h-[1.75rem]" aria-live="polite">
+                    {ballHolderPiece && (
+                        <>
+                            <div
+                                style={ballHolderPiece.side === 'white' ? WHITE_PIECE_STYLE : BLACK_PIECE_STYLE}
+                                className="relative w-7 h-7 flex items-center justify-center rounded-full shrink-0"
+                            >
+                                <PieceIcon type={ballHolderPiece.type} side={ballHolderPiece.side} />
+                                <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 flex items-center justify-center rounded-full bg-bg-secondary border border-border-subtle">
+                                    <div className="w-2.5 h-2.5"><Football /></div>
+                                </div>
+                            </div>
+                            <span className="font-inter text-[11px] text-fg-secondary">
+                                {t('ballHolder')}: {t(`pieces.${ballHolderPiece.type}`)}
+                            </span>
+                        </>
+                    )}
+                </div>
+
+                {keyboardNav && (
+                    <div
+                        ref={shortcutsRef}
+                        className="relative"
+                        onKeyDown={e => e.stopPropagation()}
+                    >
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setShortcutsOpen(o => !o) }}
+                            aria-label={t('shortcuts.buttonLabel')}
+                            aria-expanded={shortcutsOpen}
+                            className="w-8 h-8 flex items-center justify-center rounded-full bg-bg-secondary/80 border border-border-subtle text-fg-muted hover:text-fg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
+                        >
+                            <HelpCircle size={16} strokeWidth={2} aria-hidden="true" />
+                        </button>
+                        {shortcutsOpen && (
+                            <div
+                                className="absolute top-full right-0 mt-1 z-50 w-max max-w-[220px] bg-bg-secondary border border-border-subtle rounded-md shadow-xl p-2.5 pointer-events-auto"
+                                onClick={e => e.stopPropagation()}
+                            >
+                                <p className="font-inter text-[11px] font-semibold text-fg-primary mb-1.5">{t('shortcuts.title')}</p>
+                                <ul className="font-mono text-[10px] text-fg-secondary leading-relaxed">
+                                    <li><kbd className="text-fg-primary">↑↓←→</kbd> {t('shortcuts.arrows')}</li>
+                                    <li><kbd className="text-fg-primary">Enter</kbd> {t('shortcuts.select')}</li>
+                                    <li><kbd className="text-fg-primary">M</kbd> {t('shortcuts.move')}</li>
+                                    <li><kbd className="text-fg-primary">P</kbd> {t('shortcuts.pass')}</li>
+                                    <li><kbd className="text-fg-primary">Esc</kbd> {t('shortcuts.cancel')}</li>
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
             <div className="relative" style={{ containerType: 'inline-size' }}>
                 <div className="grid grid-cols-9 gap-[1px]">
                     {renderSquares()}
@@ -558,41 +621,6 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                     </div>
                 )}
 
-                {/* §12: keyboard-shortcuts tooltip ("?") — desktop only: arrow-key
-                    navigation isn't a touch affordance, and keyboardNav defaults
-                    true package-wide, so this can't just gate on that prop alone. */}
-                {keyboardNav && (
-                    <div
-                        ref={shortcutsRef}
-                        className="hidden md:block absolute top-2 right-2 z-40"
-                        onKeyDown={e => e.stopPropagation()}
-                    >
-                        <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setShortcutsOpen(o => !o) }}
-                            aria-label={t('shortcuts.buttonLabel')}
-                            aria-expanded={shortcutsOpen}
-                            className="w-11 h-11 flex items-center justify-center rounded-full bg-bg-secondary/80 border border-border-subtle text-fg-muted hover:text-fg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green backdrop-blur-sm"
-                        >
-                            <HelpCircle size={16} strokeWidth={2} aria-hidden="true" />
-                        </button>
-                        {shortcutsOpen && (
-                            <div
-                                className="absolute top-full right-0 mt-1 z-50 w-max max-w-[220px] bg-bg-secondary border border-border-subtle rounded-md shadow-xl p-2.5 pointer-events-auto"
-                                onClick={e => e.stopPropagation()}
-                            >
-                                <p className="font-inter text-[11px] font-semibold text-fg-primary mb-1.5">{t('shortcuts.title')}</p>
-                                <ul className="font-mono text-[10px] text-fg-secondary leading-relaxed">
-                                    <li><kbd className="text-fg-primary">↑↓←→</kbd> {t('shortcuts.arrows')}</li>
-                                    <li><kbd className="text-fg-primary">Enter</kbd> {t('shortcuts.select')}</li>
-                                    <li><kbd className="text-fg-primary">M</kbd> {t('shortcuts.move')}</li>
-                                    <li><kbd className="text-fg-primary">P</kbd> {t('shortcuts.pass')}</li>
-                                    <li><kbd className="text-fg-primary">Esc</kbd> {t('shortcuts.cancel')}</li>
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-                )}
             </div>
         </div>
     )
