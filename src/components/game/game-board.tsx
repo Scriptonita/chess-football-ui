@@ -5,8 +5,8 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import GamePiece from './game-piece'
 import { BallHolderChip } from './ball-holder-chip'
 import { KeyboardShortcutsList } from './keyboard-shortcuts'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Side, Position, MoveHistoryEntry } from '@scriptonita/chess-football-engine'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { Side, Position, MoveHistoryEntry, Piece, LONG_KEY, squareName } from '@scriptonita/chess-football-engine'
 import { Football } from './football'
 import { GrassOverlay, PitchMarkings, pitchSquareClass } from './pitch'
 import { FILE_LABELS, RANK_LABELS } from '@scriptonita/chess-football-engine'
@@ -51,6 +51,7 @@ const BALL_SLIDE  = { type: 'spring' as const, stiffness: 300, damping: 26, mass
 
 export default function GameBoard({ userSide, showCoordinates = false, keyboardNav = true, toolbar = true }: GameBoardProps) {
     const t = useGameT()
+    const boardId = useId()
     const prefersReducedMotion = useReducedMotion()
     const {
         boardState,
@@ -335,9 +336,49 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
         }
     }
 
-    const renderSquares = () => {
-        const squares = []
+    const cellId = (x: number, y: number) => `${boardId}-sq-${x}-${y}`
+
+    /**
+     * The square's accessible name: coordinate first (so a screen reader user
+     * always knows where the cursor is), then what is on it, then why it is
+     * highlighted. Fragments are joined with ", " rather than composed into one
+     * template so every part stays independently translatable.
+     */
+    const squareLabel = (
+        x: number,
+        y: number,
+        pieceAt: Piece | undefined,
+        isValidMove: boolean,
+        isValidPass: boolean,
+    ) => {
+        const square = squareName({ x, y })
+        const ballHere = ball.pos.x === x && ball.pos.y === y
+        const parts: string[] = []
+
+        if (pieceAt) {
+            const piece = t(`pieces.${LONG_KEY[pieceAt.type]}`)
+            const team = pieceAt.side === 'white' ? t('teamWhite') : t('teamBlack')
+            parts.push(t(ballHere ? 'square.pieceWithBall' : 'square.piece', { square, piece, team }))
+        } else {
+            parts.push(t(ballHere ? 'square.emptyWithBall' : 'square.empty', { square }))
+        }
+
+        if (isValidMove && isValidPass) parts.push(t('square.moveOrPassTarget'))
+        else if (isValidMove) parts.push(t('square.moveTarget'))
+        else if (isValidPass) parts.push(t('square.passTarget'))
+
+        if (pieceAt && pieceAt.id === selectedPieceId) parts.push(t('square.selected'))
+
+        return parts.join(', ')
+    }
+
+    // One `role="row"` per rank. `display: contents` keeps the rows out of the
+    // layout so the 9x12 CSS grid is unchanged — only the accessibility tree
+    // gains the row structure `role="grid"` requires.
+    const renderRows = () => {
+        const rows = []
         for (let y = ROWS - 1; y >= 0; y--) {
+            const squares = []
             for (let x = 0; x < COLS; x++) {
                 const isValidMove = validMoves.some(m => m.x === x && m.y === y)
                 const isValidPass = validPasses.some(p => p.x === x && p.y === y)
@@ -363,6 +404,10 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                 squares.push(
                     <div
                         key={`${x}-${y}`}
+                        id={cellId(x, y)}
+                        role="gridcell"
+                        aria-label={squareLabel(x, y, pieceAt, isValidMove, isValidPass)}
+                        aria-selected={!!pieceAt && pieceAt.id === selectedPieceId}
                         onClick={() => handleSquareClick(x, y)}
                         onMouseEnter={() => { if (isValidPass) setHoveredPassAt({ x, y }) }}
                         onMouseLeave={() => setHoveredPassAt(null)}
@@ -429,28 +474,25 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                     </div>
                 )
             }
+            rows.push(
+                <div key={`row-${y}`} role="row" className="contents">
+                    {squares}
+                </div>,
+            )
         }
-        return squares
+        return rows
     }
 
     const board = (
         <div
+            data-testid="board-root"
             className={cn(
                 // §6: Mobile edge-to-edge — thin 2px margin, no border, no radius
                 "w-full mx-0.5 bg-[#1a3317] overflow-hidden",
                 // §5+§6: Desktop — centered, rounded, bordered, height-based max-width
                 "md:mx-auto md:rounded-xl md:shadow-2xl md:border-4 md:border-[#1a3317]",
                 "md:max-w-[min(700px,calc((100dvh_-_150px)*0.75))]",
-                keyboardNav && "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-green focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary",
             )}
-            {...(keyboardNav
-                ? {
-                    tabIndex: 0,
-                    role: 'application',
-                    'aria-label': 'Game board — arrow keys to move the cursor, Enter to act',
-                    onKeyDown: handleKeyDown,
-                }
-                : {})}
         >
             {/* §12: desktop-only board toolbar — sits in its own row above the grid so
                 nothing here ever overlaps a playable square. Left: persistent ball-holder
@@ -465,7 +507,16 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                         <div
                             ref={shortcutsRef}
                             className="relative"
-                            onKeyDown={e => e.stopPropagation()}
+                            // The board's own key handler lives on the grid, which
+                            // is not an ancestor of this button — so Escape has to
+                            // be handled here or the popover can't be closed from
+                            // the keyboard at all.
+                            onKeyDown={e => {
+                                if (e.key === 'Escape' && shortcutsOpen) {
+                                    e.stopPropagation()
+                                    setShortcutsOpen(false)
+                                }
+                            }}
                         >
                             <button
                                 type="button"
@@ -491,8 +542,29 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
             )}
 
             <div className="relative" style={{ containerType: 'inline-size' }}>
-                <div className="grid grid-cols-9 gap-[1px]">
-                    {renderSquares()}
+                {/* `role="grid"` sits on the grid element itself, not on the
+                    wrapper: the wrapper also holds the toolbar, and a button is
+                    not a valid child of a grid. It replaces the previous
+                    `role="application"`, which suppressed the screen reader's
+                    reading mode without offering any structure in exchange. */}
+                <div
+                    role="grid"
+                    aria-label={t('boardAriaLabel')}
+                    aria-rowcount={ROWS}
+                    aria-colcount={COLS}
+                    className={cn(
+                        "grid grid-cols-9 gap-[1px]",
+                        keyboardNav && "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-green",
+                    )}
+                    {...(keyboardNav
+                        ? {
+                            tabIndex: 0,
+                            onKeyDown: handleKeyDown,
+                            'aria-activedescendant': cursor ? cellId(cursor.x, cursor.y) : undefined,
+                        }
+                        : {})}
+                >
+                    {renderRows()}
                 </div>
 
                 {/* Turf grain + stadium light: decorative, click-through. */}
@@ -524,7 +596,9 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                     )}
                 </svg>
 
-                <div className="absolute inset-0 pointer-events-none" data-testid="pieces-layer">
+                {/* Visual layer only: every piece is already announced by its
+                    grid cell, so exposing it twice would double the board. */}
+                <div className="absolute inset-0 pointer-events-none" data-testid="pieces-layer" aria-hidden="true">
                     <AnimatePresence mode="sync">
                         {boardState.pieces.map(piece => {
                             const isPickupCarrier = pickupCarrierId === piece.id

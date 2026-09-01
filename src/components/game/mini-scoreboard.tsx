@@ -35,19 +35,31 @@ export function MiniScoreboard({
 
     return (
         <div
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
             className={cn(
                 'w-full max-w-[540px] rounded-xl bg-bg-surface border border-border-subtle',
                 'flex items-center justify-between gap-4 px-5 py-3',
                 className,
             )}
         >
-            <SideCell name={myName} team={myTeam} score={myScore} isActive={isMyTurn} align="left" />
+            {/* El bloque visual se oculta al lector y se sustituye por una única
+                frase con nombres y marcador: leído celda a celda, "2" "vs" "1"
+                no dice de quién es cada cifra. */}
+            <div className="contents" aria-hidden="true">
+                <SideCell name={myName} team={myTeam} score={myScore} isActive={isMyTurn} align="left" />
 
-            <span className="font-anton text-base text-fg-muted uppercase tracking-[2px]" aria-hidden="true">
-                vs
+                <span className="font-anton text-base text-fg-muted uppercase tracking-[2px]">
+                    vs
+                </span>
+
+                <SideCell name={rivalName} team={rivalTeam} score={rivalScore} isActive={!isMyTurn} align="right" />
+            </div>
+
+            <span className="sr-only">
+                {t('scoreAriaLabel', { me: myName, myScore, rival: rivalName, rivalScore })}
             </span>
-
-            <SideCell name={rivalName} team={rivalTeam} score={rivalScore} isActive={!isMyTurn} align="right" />
         </div>
     )
 }

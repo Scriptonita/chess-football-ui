@@ -32,3 +32,7 @@ export { GameI18nProvider, useGameT, GAME_I18N_KEYS, type GameTranslator, type G
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 export { cn } from './lib/utils'
+// Apps render their own modals (end-of-match overlays, sheets). They get the
+// same focus contract as the package's dialogs instead of reimplementing it —
+// which is how those overlays ended up with no focus management at all.
+export { useDialogA11y } from './lib/use-dialog-a11y'

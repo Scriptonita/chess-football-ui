@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useGameStore } from '../../store/use-game-store'
 import { cn } from '../../lib/utils'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -6,6 +6,7 @@ import { MoveHistory } from './move-history'
 import { squareName, SHORT_KEY } from '@scriptonita/chess-football-engine'
 import type { MoveHistoryEntry } from '@scriptonita/chess-football-engine'
 import { useGameT } from '../../i18n'
+import { useDialogA11y } from '../../lib/use-dialog-a11y'
 import { X } from 'lucide-react'
 
 interface MobileHistoryProps {
@@ -15,6 +16,8 @@ interface MobileHistoryProps {
 export function MobileHistory({ className }: MobileHistoryProps) {
     const { boardState } = useGameStore()
     const [open, setOpen] = useState(false)
+    const titleId = `${useId()}-title`
+    const panelRef = useDialogA11y({ open, onClose: () => setOpen(false) })
 
     const lastMove = boardState?.moveHistory?.at(-1)
 
@@ -43,11 +46,13 @@ export function MobileHistory({ className }: MobileHistoryProps) {
                             animate={{ y: 0 }}
                             exit={{ y: '100%' }}
                             transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-                            className="fixed bottom-0 left-0 right-0 z-50 bg-bg-secondary rounded-t-2xl border-t border-border-subtle shadow-xl"
+                            ref={panelRef}
+                            className="fixed bottom-0 left-0 right-0 z-50 bg-bg-secondary rounded-t-2xl border-t border-border-subtle shadow-xl focus:outline-none"
                             role="dialog"
                             aria-modal="true"
+                            aria-labelledby={titleId}
                         >
-                            <SheetHeader onClose={() => setOpen(false)} />
+                            <SheetHeader titleId={titleId} onClose={() => setOpen(false)} />
                             <div className="px-4 pb-6 max-h-[50dvh] overflow-y-auto">
                                 <MoveHistory scrollable={false} />
                             </div>
@@ -59,19 +64,19 @@ export function MobileHistory({ className }: MobileHistoryProps) {
     )
 }
 
-function SheetHeader({ onClose }: { onClose: () => void }) {
+function SheetHeader({ titleId, onClose }: { titleId: string; onClose: () => void }) {
     const t = useGameT()
     return (
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border-subtle">
-            <span className="font-mono text-[10px] tracking-[0.5px] uppercase text-fg-muted">
+            <span id={titleId} className="font-mono text-[10px] tracking-[0.5px] uppercase text-fg-muted">
                 {t('history.title')}
             </span>
             <button
                 onClick={onClose}
                 className="w-8 h-8 flex items-center justify-center rounded-full bg-bg-surface hover:bg-bg-surface-elevated text-fg-muted hover:text-fg-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
-                aria-label="Close"
+                aria-label={t('history.close')}
             >
-                <X size={14} />
+                <X size={14} aria-hidden="true" />
             </button>
         </div>
     )

@@ -29,6 +29,17 @@ import GameBoard from './game-board'
 import { useGameStore, getInitialBoardState } from '../../store/use-game-store'
 import { getValidMoves, getValidPasses } from '@scriptonita/chess-football-engine'
 import { useReducedMotion } from 'framer-motion'
+import { GameI18nProvider } from '../../i18n'
+
+// Interpolating translator, so a label assertion checks the composed sentence
+// a screen reader would actually read — not just which key was picked.
+const withI18n = (ui: React.ReactNode) => (
+  <GameI18nProvider t={(key, values) =>
+    values ? `${key}(${Object.entries(values).map(([k, v]) => `${k}=${v}`).join(',')})` : key
+  }>
+    {ui}
+  </GameI18nProvider>
+)
 
 beforeEach(() => {
   useGameStore.setState({ boardState: null, selectedPieceId: null, interactionMode: null })
@@ -44,16 +55,61 @@ describe('GameBoard', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('renders the interactive board region when a board state is present', () => {
+  it('exposes the board as a labelled 9x12 grid, not an opaque application region', () => {
     useGameStore.setState({ boardState: getInitialBoardState('white') })
     render(<GameBoard userSide="white" />)
-    expect(screen.getByRole('application')).toBeInTheDocument()
+
+    const grid = screen.getByRole('grid', { name: 'boardAriaLabel' })
+    expect(grid).toHaveAttribute('aria-rowcount', '12')
+    expect(grid).toHaveAttribute('aria-colcount', '9')
+    expect(screen.getAllByRole('row')).toHaveLength(12)
+    expect(screen.getAllByRole('gridcell')).toHaveLength(108)
+    // role="application" muted the screen reader's reading mode for nothing.
+    expect(screen.queryByRole('application')).not.toBeInTheDocument()
   })
 
-  it('is not a keyboard application when keyboardNav is disabled', () => {
+  it('names every square by coordinate and contents', () => {
+    const state = getInitialBoardState('white')
+    useGameStore.setState({ boardState: state })
+    render(withI18n(<GameBoard userSide="white" />))
+
+    const labels = screen.getAllByRole('gridcell').map(c => c.getAttribute('aria-label'))
+    expect(labels).toHaveLength(108)
+    // Every square names its own coordinate, so the cursor position is never ambiguous.
+    expect(labels.filter(l => /square=A1[,)]/.test(l ?? ''))).toHaveLength(1)
+    expect(labels.filter(l => /square=I12[,)]/.test(l ?? ''))).toHaveLength(1)
+
+    // An occupied square announces the piece and its team; an empty one says so.
+    const occupied = state.pieces.length
+    expect(labels.filter(l => l?.startsWith('square.piece'))).toHaveLength(occupied)
+    expect(labels.filter(l => l?.startsWith('square.empty'))).toHaveLength(108 - occupied)
+    // Exactly one square carries the ball, whoever holds it.
+    expect(labels.filter(l => l?.includes('WithBall'))).toHaveLength(1)
+    // A piece square carries the piece name and its team, not just a coordinate.
+    const aPiece = labels.find(l => l?.startsWith('square.piece'))!
+    expect(aPiece).toMatch(/piece=\w+/)
+    expect(aPiece).toMatch(/team=team(White|Black)/)
+  })
+
+  it('tracks the keyboard cursor with aria-activedescendant', () => {
+    useGameStore.setState({ boardState: getInitialBoardState('white') })
+    render(<GameBoard userSide="white" />)
+
+    const grid = screen.getByRole('grid')
+    expect(grid).not.toHaveAttribute('aria-activedescendant')
+
+    fireEvent.keyDown(grid, { key: 'ArrowUp' })
+
+    const active = grid.getAttribute('aria-activedescendant')
+    expect(active).toBeTruthy()
+    expect(document.getElementById(active!)).toHaveAttribute('role', 'gridcell')
+  })
+
+  it('is not keyboard-operable when keyboardNav is disabled', () => {
     useGameStore.setState({ boardState: getInitialBoardState('white') })
     render(<GameBoard userSide="white" keyboardNav={false} />)
-    expect(screen.queryByRole('application')).not.toBeInTheDocument()
+    // Still a grid for screen readers — just not a tab stop.
+    expect(screen.getByRole('grid')).not.toHaveAttribute('tabindex')
   })
 
   it('renders coordinate guides when showCoordinates is set', () => {
@@ -71,7 +127,7 @@ describe('GameBoard', () => {
     })
     render(<GameBoard userSide="white" />)
 
-    fireEvent.keyDown(screen.getByRole('application'), { key: 'Escape' })
+    fireEvent.keyDown(screen.getByRole('grid'), { key: 'Escape' })
 
     const s = useGameStore.getState()
     expect(s.selectedPieceId).toBeNull()
@@ -108,14 +164,17 @@ describe('GameBoard — keyboard shortcuts tooltip (§12)', () => {
     expect(screen.queryByText('shortcuts.title')).not.toBeInTheDocument()
   })
 
-  it('closes on Escape', () => {
+  it('closes on Escape pressed on the shortcuts button itself', () => {
     useGameStore.setState({ boardState: getInitialBoardState('white') })
     render(<GameBoard userSide="white" />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'shortcuts.buttonLabel' }))
+    const trigger = screen.getByRole('button', { name: 'shortcuts.buttonLabel' })
+    fireEvent.click(trigger)
     expect(screen.getByText('shortcuts.title')).toBeInTheDocument()
 
-    fireEvent.keyDown(screen.getByRole('application'), { key: 'Escape' })
+    // Escape has to be handled where the focus actually is: the wrapper stops
+    // propagation, so the board's own handler never receives this event.
+    fireEvent.keyDown(trigger, { key: 'Escape' })
     expect(screen.queryByText('shortcuts.title')).not.toBeInTheDocument()
   })
 
@@ -128,7 +187,7 @@ describe('GameBoard — keyboard shortcuts tooltip (§12)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'shortcuts.buttonLabel' }))
     expect(screen.getByText('shortcuts.title')).toBeInTheDocument()
 
-    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    const squares = container.querySelectorAll('[role="gridcell"]')
     fireEvent.mouseDown(squares[0])
     expect(screen.queryByText('shortcuts.title')).not.toBeInTheDocument()
   })
@@ -148,7 +207,7 @@ describe('GameBoard — invalid-action shake (§16)', () => {
     })
     const { container } = render(<GameBoard userSide="white" />)
 
-    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    const squares = container.querySelectorAll('[role="gridcell"]')
     expect(squares.length).toBeGreaterThan(0)
     fireEvent.click(squares[0])
 
@@ -179,7 +238,7 @@ describe('GameBoard — invalid-action shake (§16)', () => {
     useGameStore.setState({ boardState: getInitialBoardState('white'), selectedPieceId: null })
     const { container } = render(<GameBoard userSide="white" />)
 
-    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    const squares = container.querySelectorAll('[role="gridcell"]')
     fireEvent.click(squares[0])
 
     expect(screen.queryByTestId('invalid-action-shake')).not.toBeInTheDocument()
@@ -210,7 +269,7 @@ describe('GameBoard — pass trajectory preview (§16)', () => {
     setUpBallCarrierAt(1, 5)
     const { container } = render(<GameBoard userSide="white" />)
 
-    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    const squares = container.querySelectorAll('[role="gridcell"]')
     fireEvent.mouseEnter(squares[squareIndex(3, 5)])
 
     const line = screen.getByTestId('pass-trajectory-line')
@@ -222,7 +281,7 @@ describe('GameBoard — pass trajectory preview (§16)', () => {
     setUpBallCarrierAt(1, 5, [interceptor])
     const { container } = render(<GameBoard userSide="white" />)
 
-    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    const squares = container.querySelectorAll('[role="gridcell"]')
     fireEvent.mouseEnter(squares[squareIndex(3, 5)])
 
     const line = screen.getByTestId('pass-trajectory-line')
@@ -233,7 +292,7 @@ describe('GameBoard — pass trajectory preview (§16)', () => {
     setUpBallCarrierAt(1, 5)
     const { container } = render(<GameBoard userSide="white" />)
 
-    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    const squares = container.querySelectorAll('[role="gridcell"]')
     const target = squares[squareIndex(3, 5)]
     fireEvent.mouseEnter(target)
     expect(screen.getByTestId('pass-trajectory-line')).toBeInTheDocument()
@@ -247,7 +306,7 @@ describe('GameBoard — pass trajectory preview (§16)', () => {
     setUpBallCarrierAt(1, 5, [interceptor])
     const { container } = render(<GameBoard userSide="white" />)
 
-    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    const squares = container.querySelectorAll('[role="gridcell"]')
     fireEvent.mouseEnter(squares[squareIndex(3, 5)])
 
     expect(screen.getByTestId('pass-trajectory-line')).toHaveAttribute('stroke', 'var(--danger)')
@@ -259,7 +318,7 @@ describe('GameBoard — pass trajectory preview (§16)', () => {
     carrier.type = 'knight'
     const { container } = render(<GameBoard userSide="white" />)
 
-    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    const squares = container.querySelectorAll('[role="gridcell"]')
     fireEvent.mouseEnter(squares[squareIndex(3, 5)])
 
     expect(screen.getByTestId('pass-trajectory-line')).toHaveAttribute('stroke', 'var(--pass-highlight)')
@@ -306,7 +365,7 @@ describe('GameBoard — sequential replay of a multi-action opponent turn (§4)'
 
     act(() => { useGameStore.setState({ boardState: finishedOpponentTurnBoardState(boardState) }) })
 
-    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    const squares = container.querySelectorAll('[role="gridcell"]')
     expect(hasHighlight(squares, 2, 6)).toBe(true)
     expect(hasHighlight(squares, 3, 6)).toBe(true)
     expect(hasHighlight(squares, 4, 6)).toBe(false)
@@ -355,7 +414,7 @@ describe('GameBoard — sequential replay of a multi-action opponent turn (§4)'
 
     act(() => { useGameStore.setState({ boardState: finishedOpponentTurnBoardState(boardState) }) })
 
-    const squares = container.querySelectorAll('.grid-cols-9 > div')
+    const squares = container.querySelectorAll('[role="gridcell"]')
     expect(hasHighlight(squares, 4, 6)).toBe(true)
     expect(hasHighlight(squares, 5, 6)).toBe(true)
     expect(hasHighlight(squares, 2, 6)).toBe(false)
@@ -368,7 +427,7 @@ describe('GameBoard — pitch surface', () => {
   it('layers the grass grain and chalk markings between the squares and the pieces', () => {
     useGameStore.setState({ boardState: getInitialBoardState('white') })
     render(<GameBoard userSide="white" />)
-    const board = screen.getByRole('application')
+    const board = screen.getByTestId('board-root')
     const grass = board.querySelector('[data-testid="grass-overlay"]') as HTMLElement
     const markings = board.querySelector('[data-testid="pitch-markings"]') as HTMLElement
     const pieces = board.querySelector('[data-testid="pieces-layer"]') as HTMLElement
@@ -383,7 +442,7 @@ describe('GameBoard — pitch surface', () => {
   it('positions pieces with GPU-friendly transforms (no left/top layout animation)', () => {
     useGameStore.setState({ boardState: getInitialBoardState('white') })
     render(<GameBoard userSide="white" />)
-    const pieces = screen.getByRole('application').querySelector('[data-testid="pieces-layer"]') as HTMLElement
+    const pieces = screen.getByTestId('board-root').querySelector('[data-testid="pieces-layer"]') as HTMLElement
     const wrappers = pieces.querySelectorAll('[data-piece-id]')
     expect(wrappers.length).toBe(getInitialBoardState('white').pieces.length)
     wrappers.forEach(w => {
@@ -399,16 +458,16 @@ describe('GameBoard — toolbar placement', () => {
   it('renders the ball-holder chip and shortcuts button above the grid by default', () => {
     useGameStore.setState({ boardState: getInitialBoardState('white') })
     render(<GameBoard userSide="white" />)
-    expect(screen.getByRole('application').querySelector('[data-testid="board-toolbar"]')).not.toBeNull()
+    expect(screen.getByTestId('board-root').querySelector('[data-testid="board-toolbar"]')).not.toBeNull()
     expect(screen.getByRole('button', { name: 'shortcuts.buttonLabel' })).toBeInTheDocument()
   })
 
   it('omits the toolbar when the app places those controls elsewhere (toolbar={false})', () => {
     useGameStore.setState({ boardState: getInitialBoardState('white') })
     render(<GameBoard userSide="white" toolbar={false} />)
-    expect(screen.getByRole('application').querySelector('[data-testid="board-toolbar"]')).toBeNull()
+    expect(screen.getByTestId('board-root').querySelector('[data-testid="board-toolbar"]')).toBeNull()
     expect(screen.queryByRole('button', { name: 'shortcuts.buttonLabel' })).toBeNull()
     // keyboard operation itself is unaffected
-    expect(screen.getByRole('application')).toHaveAttribute('tabindex', '0')
+    expect(screen.getByRole('grid')).toHaveAttribute('tabindex', '0')
   })
 })

@@ -5,9 +5,14 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'destructive'
 type Size = 'default' | 'sm' | 'lg' | 'icon'
 
 const VARIANT: Record<Variant, string> = {
+  // White on `--accent-green` is 4.27:1 — under WCAG AA for the Anton 400 the
+  // primary CTA is set in. `--accent-green-dark` clears it (~6.5:1), so the
+  // resting state is the dark green and interaction brightens it rather than
+  // darkening it. Hover/active are transient; the resting state is the one a
+  // player reads.
   primary:
-    'bg-accent-green text-fg-primary font-anton tracking-widest rounded-md ' +
-    'hover:bg-accent-green-light active:bg-accent-green-dark',
+    'bg-accent-green-dark text-fg-primary font-anton tracking-widest rounded-md ' +
+    'hover:bg-accent-green active:bg-accent-green-light',
   secondary:
     'bg-bg-surface text-fg-primary font-inter font-semibold rounded-md ' +
     'border border-border-subtle hover:bg-bg-surface-elevated active:bg-bg-secondary',

@@ -35,6 +35,27 @@ npm install @scriptonita/chess-football-ui
   (`bg-bg-surface`, `text-accent-green`, …). Each app must define those tokens and include this
   package's files in its Tailwind `content`/`@source` scan so the classes are generated.
 
+## Host app contract
+
+Two things the package cannot enforce at build time and every consumer must check:
+
+**1. Translation coverage.** `GAME_I18N_KEYS` is the manifest of every `game`-namespace key
+the components read. Assert it in each app's test suite — without this, a key added here
+surfaces as raw text on the pitch (`⚠ game.offsideWarning`) instead of failing CI:
+
+```ts
+import { GAME_I18N_KEYS } from '@scriptonita/chess-football-ui'
+import es from './messages/es.json'
+
+const missing = GAME_I18N_KEYS.filter(k => !k.split('.').reduce<any>((o, p) => o?.[p], es.game))
+expect(missing).toEqual([])
+```
+
+**2. Design tokens.** Components emit Tailwind classes bound to tokens the app defines. A
+token that is missing fails silently — the rule simply does not apply. The board's
+`--last-move-highlight`, `--move-highlight`, `--pass-highlight`, `--accent-green`,
+`--accent-green-light` and `--accent-green-dark` are all required.
+
 ## Peer dependencies
 
 `react`, `react-dom`, `framer-motion`, `lucide-react`.

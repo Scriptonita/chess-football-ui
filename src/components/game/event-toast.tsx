@@ -8,11 +8,12 @@ interface EventToastProps {
     className?: string
 }
 
-type ToastEvent = 'interception' | 'offside' | 'tackle'
+type ToastEvent = 'goal' | 'interception' | 'offside' | 'tackle'
 
-const TOASTABLE: ReadonlySet<string> = new Set(['interception', 'offside', 'tackle'])
+const TOASTABLE: ReadonlySet<string> = new Set<ToastEvent>(['goal', 'interception', 'offside', 'tackle'])
 
 const TOAST_CONFIG: Record<ToastEvent, string> = {
+    goal:         'bg-accent-green/20 border-accent-green/60 text-accent-green-light',
     interception: 'bg-danger/20 border-danger/50 text-danger',
     offside:      'bg-warning/20 border-warning/50 text-warning',
     tackle:       'bg-warning/20 border-warning/50 text-warning',
