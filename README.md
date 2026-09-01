@@ -52,9 +52,20 @@ expect(missing).toEqual([])
 ```
 
 **2. Design tokens.** Components emit Tailwind classes bound to tokens the app defines. A
-token that is missing fails silently — the rule simply does not apply. The board's
-`--last-move-highlight`, `--move-highlight`, `--pass-highlight`, `--accent-green`,
-`--accent-green-light` and `--accent-green-dark` are all required.
+token that is missing fails silently — Tailwind emits the rule, the variable resolves to
+nothing, and the declaration is dropped. That is how `--last-move-highlight` went missing
+in the CrazyGames SPA: the last-move highlight and the bot's turn replay never rendered,
+with no error anywhere. `REQUIRED_TOKENS` is the manifest; assert it the same way:
+
+```ts
+import { REQUIRED_TOKENS } from '@scriptonita/chess-football-ui'
+
+const css = readFileSync('src/index.css', 'utf8')
+expect(REQUIRED_TOKENS.filter(t => !css.includes(`${t}:`))).toEqual([])
+```
+
+`--field-frame` is new in 0.9.0: the board frame was hardcoded `#1a3317` in three places,
+hand-tuned for the webapp's grass and visibly wrong against the CrazyGames pitch.
 
 ## Peer dependencies
 

@@ -153,3 +153,28 @@ describe('useGameStore — endTurn & resetTurn', () => {
     expect(s.boardState!.pieces.every(p => !p.hasMovedThisTurn)).toBe(true)
   })
 })
+
+describe('useGameStore — reset', () => {
+    it('returns the store to its initial state', () => {
+        useGameStore.setState({
+            boardState: getInitialBoardState('white'),
+            selectedPieceId: 'white_rook_0_1',
+            interactionMode: 'move',
+        })
+
+        useGameStore.getState().reset()
+
+        const s = useGameStore.getState()
+        expect(s.boardState).toBeNull()
+        expect(s.selectedPieceId).toBeNull()
+        expect(s.interactionMode).toBeNull()
+    })
+
+    it('clears the previous match so a new one cannot re-detect its final goal', () => {
+        // The store is a module-global singleton: without reset, a new match
+        // mounts on the last board — which ended on a goal (webapp PR #42).
+        useGameStore.setState({ boardState: getInitialBoardState('white') })
+        useGameStore.getState().reset()
+        expect(useGameStore.getState().boardState).toBeNull()
+    })
+})

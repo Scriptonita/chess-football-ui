@@ -8,13 +8,12 @@ import { useGameT } from '../../i18n'
 
 interface GameControlsProps {
   isMyTurn: boolean
+  className?: string
 }
 
-export default function GameControls({ isMyTurn }: GameControlsProps) {
-  const {
-    boardState,
-    endTurn,
-  } = useGameStore()
+export default function GameControls({ isMyTurn, className }: GameControlsProps) {
+  const boardState = useGameStore(s => s.boardState)
+  const endTurn = useGameStore(s => s.endTurn)
 
   const t = useGameT()
   const [showEndTurnConfirm, setShowEndTurnConfirm] = useState(false)
@@ -33,7 +32,7 @@ export default function GameControls({ isMyTurn }: GameControlsProps) {
   }
 
   return (
-    <div className="w-full bg-bg-secondary flex flex-col gap-3 px-5 pt-3 pb-5">
+    <div className={cn('w-full bg-bg-secondary flex flex-col gap-3 px-5 pt-3 pb-5', className)}>
       {/* Finalizar turno */}
       {isMyTurn && (
         <Button
@@ -54,7 +53,11 @@ export default function GameControls({ isMyTurn }: GameControlsProps) {
 
       {/* Turno del rival */}
       {!isMyTurn && (
-        <div className="flex items-center justify-center h-11 rounded-md bg-bg-surface border border-border-subtle">
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-center justify-center h-11 rounded-md bg-bg-surface border border-border-subtle"
+        >
           <span className="font-inter text-sm text-fg-muted">{t('waitingRival')}</span>
         </div>
       )}

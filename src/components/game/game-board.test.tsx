@@ -471,3 +471,75 @@ describe('GameBoard — toolbar placement', () => {
     expect(screen.getByRole('grid')).toHaveAttribute('tabindex', '0')
   })
 })
+
+describe('GameBoard — interaction mode (was dead state)', () => {
+  const SELECTED = 'white_rook_0_1'
+  const targets = [{ x: 4, y: 4 }, { x: 5, y: 4 }]
+
+  const setup = (interactionMode: 'move' | 'pass' | null) => {
+    vi.mocked(getValidMoves).mockReturnValue(targets)
+    vi.mocked(getValidPasses).mockReturnValue(targets)
+    const board = getInitialBoardState('white')
+    useGameStore.setState({
+      boardState: { ...board, ball: { ...board.ball, holderId: SELECTED } },
+      selectedPieceId: SELECTED,
+      interactionMode,
+    })
+    return render(<GameBoard userSide="white" />)
+  }
+
+  it('shows both affordances when no mode is chosen', () => {
+    setup(null)
+    expect(screen.getAllByTestId('move-marker').length).toBeGreaterThan(0)
+    expect(screen.getAllByTestId('pass-marker').length).toBeGreaterThan(0)
+  })
+
+  it('filters to moves only in move mode', () => {
+    // Both apps render a Move/Pass selector that writes this. The board used to
+    // ignore it completely and highlight everything either way.
+    setup('move')
+    expect(screen.getAllByTestId('move-marker').length).toBeGreaterThan(0)
+    expect(screen.queryByTestId('pass-marker')).not.toBeInTheDocument()
+  })
+
+  it('filters to passes only in pass mode', () => {
+    setup('pass')
+    expect(screen.getAllByTestId('pass-marker').length).toBeGreaterThan(0)
+    expect(screen.queryByTestId('move-marker')).not.toBeInTheDocument()
+  })
+
+  it('distinguishes move from pass by shape, not colour alone', () => {
+    // A colour-blind player cannot tell yellow from blue; a filled dot from a
+    // hollow ring, they can.
+    setup(null)
+    expect(screen.getAllByTestId('move-marker')[0].className).toMatch(/bg-move-highlight/)
+    expect(screen.getAllByTestId('pass-marker')[0].className).toMatch(/border-2 border-pass-highlight/)
+  })
+})
+
+describe('GameBoard — keyboard shortcut guards', () => {
+  it('ignores M and P when a modifier is held (Cmd+P is Print)', () => {
+    vi.mocked(getValidMoves).mockReturnValue([{ x: 4, y: 4 }])
+    vi.mocked(getValidPasses).mockReturnValue([{ x: 4, y: 4 }])
+    const board = getInitialBoardState('white')
+    useGameStore.setState({
+      boardState: { ...board, ball: { ...board.ball, holderId: 'white_rook_0_1' } },
+      selectedPieceId: 'white_rook_0_1',
+    })
+    render(<GameBoard userSide="white" />)
+
+    // Open the disambiguation popover on the doubly-valid square.
+    const cell = screen.getAllByRole('gridcell').find(c => c.id.endsWith('-sq-4-4'))!
+    fireEvent.click(cell)
+    expect(screen.getByText('move')).toBeInTheDocument()
+
+    const grid = screen.getByRole('grid')
+    fireEvent.keyDown(grid, { key: 'p', metaKey: true })
+    fireEvent.keyDown(grid, { key: 'm', ctrlKey: true })
+    // Still open: neither modified key resolved it behind the user's back.
+    expect(screen.getByText('move')).toBeInTheDocument()
+
+    fireEvent.keyDown(grid, { key: 'm' })
+    expect(screen.queryByText('move')).not.toBeInTheDocument()
+  })
+})

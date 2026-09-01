@@ -1,4 +1,5 @@
 import { useGameStore } from '../../store/use-game-store'
+import { useShallow } from 'zustand/react/shallow'
 import { getValidMoves, getValidPasses, getPath, isInEnemyArea } from '@scriptonita/chess-football-engine'
 import { cn } from '../../lib/utils'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
@@ -25,6 +26,7 @@ interface GameBoardProps {
      * `KeyboardShortcutsList` itself (e.g. in a side panel) so nothing is shown twice.
      */
     toolbar?: boolean
+    className?: string
 }
 
 // Board dimensions
@@ -49,18 +51,31 @@ const cellY = (y: number) => `${(ROWS - 1 - y) * 100}%`
 const PIECE_SLIDE = { type: 'spring' as const, stiffness: 190, damping: 28, mass: 1 }
 const BALL_SLIDE  = { type: 'spring' as const, stiffness: 300, damping: 26, mass: 0.6 }
 
-export default function GameBoard({ userSide, showCoordinates = false, keyboardNav = true, toolbar = true }: GameBoardProps) {
+export default function GameBoard({ userSide, showCoordinates = false, keyboardNav = true, toolbar = true, className }: GameBoardProps) {
     const t = useGameT()
     const boardId = useId()
     const prefersReducedMotion = useReducedMotion()
+    // Selector + useShallow: without it every `set` on the store re-renders all
+    // 108 squares, including sets this component does not care about.
     const {
         boardState,
         selectedPieceId,
+        interactionMode,
         setSelectedPieceId,
         setInteractionMode,
         movePiece,
-        passBall
-    } = useGameStore()
+        passBall,
+    } = useGameStore(
+        useShallow(s => ({
+            boardState: s.boardState,
+            selectedPieceId: s.selectedPieceId,
+            interactionMode: s.interactionMode,
+            setSelectedPieceId: s.setSelectedPieceId,
+            setInteractionMode: s.setInteractionMode,
+            movePiece: s.movePiece,
+            passBall: s.passBall,
+        })),
+    )
 
     const [cursor, setCursor] = useState<Position | null>(null)
     const [disambiguateAt, setDisambiguateAt] = useState<Position | null>(null)
@@ -144,23 +159,27 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
         return () => clearTimeout(id)
     }, [replay])
 
+    // `interactionMode` was written by both apps (their Move/Pass selector) and
+    // read by nobody: the board highlighted every target regardless and still
+    // popped the disambiguation popover. Honouring it turns that selector into
+    // a real filter — and on touch, into a way to act without the popover.
     const validMoves = useMemo(() => {
-        if (!boardState) return []
+        if (!boardState || interactionMode === 'pass') return []
         const sp = boardState.pieces.find(p => p.id === selectedPieceId)
         if (sp && !sp.hasMovedThisTurn) {
             return getValidMoves(sp, boardState)
         }
         return []
-    }, [boardState, selectedPieceId])
+    }, [boardState, selectedPieceId, interactionMode])
 
     const validPasses = useMemo(() => {
-        if (!boardState) return []
+        if (!boardState || interactionMode === 'move') return []
         const sp = boardState.pieces.find(p => p.id === selectedPieceId)
         if (sp && boardState.ball.holderId === sp.id) {
             return getValidPasses(sp, boardState)
         }
         return []
-    }, [boardState, selectedPieceId])
+    }, [boardState, selectedPieceId, interactionMode])
 
     if (!boardState) return null
 
@@ -311,13 +330,17 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                 activate(c.x, c.y)
                 break
             }
+            // Bare M / P only: Cmd+P is Print and Ctrl+M is a browser shortcut,
+            // and both used to resolve the popover behind the user's back.
             case 'm': case 'M':
+                if (e.ctrlKey || e.metaKey || e.altKey) break
                 if (disambiguateAt && selectedPieceId) {
                     movePiece(selectedPieceId, disambiguateAt)
                     setDisambiguateAt(null)
                 }
                 break
             case 'p': case 'P':
+                if (e.ctrlKey || e.metaKey || e.altKey) break
                 if (disambiguateAt) {
                     passBall(disambiguateAt)
                     setDisambiguateAt(null)
@@ -411,27 +434,39 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                         onClick={() => handleSquareClick(x, y)}
                         onMouseEnter={() => { if (isValidPass) setHoveredPassAt({ x, y }) }}
                         onMouseLeave={() => setHoveredPassAt(null)}
+                        // The preview hung off onMouseEnter alone, so it never
+                        // appeared on the touch devices that are most of the
+                        // CrazyGames audience. A first touch previews the
+                        // trajectory; handleSquareClick then confirms it.
+                        onTouchStart={() => { if (isValidPass) setHoveredPassAt({ x, y }) }}
                         className={cn(
                             pitchSquareClass(x, y),
                             "flex items-center justify-center cursor-pointer",
                             !isValidMove && !isValidPass && isLastMove && "bg-last-move-highlight/20",
                             // §8: pulsing warning ring on enemy goal area
                             isOffsideRisk && isEnemyGoalArea && !isValidMove && !isValidPass && "ring-2 ring-inset ring-warning/60",
-                            isAmbiguous && "ring-[3px] ring-inset ring-yellow-400/90 bg-yellow-400/20",
-                            !isAmbiguous && isValidMove && "ring-[3px] ring-inset ring-yellow-400/80 bg-yellow-400/15",
-                            !isAmbiguous && isValidPass && "ring-[3px] ring-inset ring-sky-400/80 bg-sky-400/15",
+                            // Move and pass used raw yellow-400/sky-400 here while
+                            // the popover a few lines below used the
+                            // move-highlight/pass-highlight tokens — two palettes
+                            // for the same two concepts. One palette now: tokens.
+                            isAmbiguous && "ring-[3px] ring-inset ring-move-highlight/90 bg-move-highlight/20",
+                            !isAmbiguous && isValidMove && "ring-[3px] ring-inset ring-move-highlight/80 bg-move-highlight/15",
+                            !isAmbiguous && isValidPass && "ring-[3px] ring-inset ring-pass-highlight/80 bg-pass-highlight/15",
                         )}
                     >
+                        {/* Colour alone does not distinguish move from pass for a
+                            colour-blind player, so the marks differ in shape too:
+                            a filled dot moves, a hollow ring passes. */}
                         {!isAmbiguous && isValidMove && !pieceAt && (
-                            <div className="w-3 h-3 rounded-full bg-yellow-400/65" />
+                            <div data-testid="move-marker" className="w-3 h-3 rounded-full bg-move-highlight/65" />
                         )}
                         {!isAmbiguous && isValidPass && !pieceAt && (
-                            <div className="w-3 h-3 rounded-full bg-sky-400/65" />
+                            <div data-testid="pass-marker" className="w-3.5 h-3.5 rounded-full border-2 border-pass-highlight/80" />
                         )}
                         {isAmbiguous && !pieceAt && (
-                            <div className="flex gap-0.5">
-                                <div className="w-2.5 h-2.5 rounded-full bg-yellow-400/80" />
-                                <div className="w-2.5 h-2.5 rounded-full bg-sky-400/80" />
+                            <div className="flex items-center gap-0.5">
+                                <div data-testid="move-marker" className="w-2.5 h-2.5 rounded-full bg-move-highlight/80" />
+                                <div data-testid="pass-marker" className="w-2.5 h-2.5 rounded-full border-2 border-pass-highlight/90" />
                             </div>
                         )}
 
@@ -488,10 +523,14 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
             data-testid="board-root"
             className={cn(
                 // §6: Mobile edge-to-edge — thin 2px margin, no border, no radius
-                "w-full mx-0.5 bg-[#1a3317] overflow-hidden",
+                // The frame was hardcoded #1a3317 in three files, hand-tuned for
+                // the webapp's darker grass and visibly wrong against the
+                // CrazyGames pitch. It is a token now (see README).
+                "w-full mx-0.5 bg-field-frame overflow-hidden",
                 // §5+§6: Desktop — centered, rounded, bordered, height-based max-width
-                "md:mx-auto md:rounded-xl md:shadow-2xl md:border-4 md:border-[#1a3317]",
+                "md:mx-auto md:rounded-xl md:shadow-2xl md:border-4 md:border-field-frame",
                 "md:max-w-[min(700px,calc((100dvh_-_150px)*0.75))]",
+                !showCoordinates && className,
             )}
         >
             {/* §12: desktop-only board toolbar — sits in its own row above the grid so
@@ -713,7 +752,7 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
 
     const ranksTopToBottom = [...RANK_LABELS].reverse()
     return (
-        <div className="w-full max-w-[540px] md:max-w-none mx-auto" aria-hidden="false">
+        <div className={cn('w-full max-w-[540px] md:max-w-none mx-auto', className)}>
             <div
                 className="grid gap-1 select-none"
                 style={{

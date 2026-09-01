@@ -1,4 +1,4 @@
-import { useGameStore } from '../../store/use-game-store'
+import { useGameStore, DEFAULT_MAX_AP } from '../../store/use-game-store'
 import { cn } from '../../lib/utils'
 import { useGameT } from '../../i18n'
 import { Zap } from 'lucide-react'
@@ -19,10 +19,11 @@ interface TurnBannerProps {
  */
 export function TurnBanner({ isMyTurn, waitingLabel, className }: TurnBannerProps) {
     const t = useGameT()
-    const { boardState } = useGameStore()
+    const boardState = useGameStore(s => s.boardState)
     if (!boardState) return null
 
-    const { actionPoints, maxActionPoints } = boardState
+    const { actionPoints, turnNumber } = boardState
+    const maxActionPoints = boardState.maxActionPoints ?? DEFAULT_MAX_AP
 
     return (
         <div
@@ -36,14 +37,23 @@ export function TurnBanner({ isMyTurn, waitingLabel, className }: TurnBannerProp
             aria-live="polite"
             aria-atomic="true"
         >
-            <span
-                className={cn(
-                    'font-anton text-sm tracking-[1.5px] uppercase',
-                    isMyTurn ? 'text-accent-green' : 'text-fg-muted',
+            <div className="flex items-baseline gap-2 min-w-0">
+                <span
+                    className={cn(
+                        'font-anton text-sm tracking-[1.5px] uppercase truncate',
+                        isMyTurn ? 'text-accent-green' : 'text-fg-muted',
+                    )}
+                >
+                    {isMyTurn ? t('yourTurn') : (waitingLabel ?? t('waitingRival'))}
+                </span>
+                {/* In a correspondence game "you are on turn 14" is first-order
+                    information. The engine exposes it and nothing rendered it. */}
+                {typeof turnNumber === 'number' && (
+                    <span className="font-mono text-[10px] text-fg-muted uppercase tracking-[0.5px] shrink-0">
+                        {t('history.turn', { n: turnNumber })}
+                    </span>
                 )}
-            >
-                {isMyTurn ? t('yourTurn') : (waitingLabel ?? t('waitingRival'))}
-            </span>
+            </div>
 
             {isMyTurn && (
                 <div className="flex items-center gap-1" aria-label={t('actionPointsAriaLabel', { remaining: actionPoints, total: maxActionPoints })}>

@@ -19,7 +19,7 @@ interface MoveHistoryProps {
  */
 export function MoveHistory({ scrollable = true, limit, className }: MoveHistoryProps) {
     const t = useGameT()
-    const { boardState } = useGameStore()
+    const boardState = useGameStore(s => s.boardState)
     const scrollRef = useRef<HTMLOListElement>(null)
 
     const history: MoveHistoryEntry[] = boardState?.moveHistory ?? []

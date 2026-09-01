@@ -1,8 +1,9 @@
-import { useGameStore } from '../../store/use-game-store'
+import { useGameStore, DEFAULT_MAX_AP } from '../../store/use-game-store'
 import { cn } from '../../lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 import { ActionPoints } from '../action-points'
 import { useGameT } from '../../i18n'
+import { PlayerIdentity } from './player-identity'
 
 interface ScoreboardProps {
   creatorUsername:   string
@@ -10,6 +11,7 @@ interface ScoreboardProps {
   creatorAvatarUrl?: string
   opponentAvatarUrl?: string
   userSide?: 'white' | 'black' | null
+  className?: string
 }
 
 function initials(name: string) {
@@ -22,9 +24,10 @@ export default function Scoreboard({
   creatorAvatarUrl,
   opponentAvatarUrl,
   userSide,
+  className,
 }: ScoreboardProps) {
   const t = useGameT()
-  const { boardState } = useGameStore()
+  const boardState = useGameStore(s => s.boardState)
   if (!boardState?.score) return null
 
   const { score, turn, actionPoints, kingMustRelease } = boardState
@@ -42,10 +45,10 @@ export default function Scoreboard({
   const myKingMustRelease    = isMyTurn  && kingMustRelease === turn
   const rivalKingMustRelease = !isMyTurn && kingMustRelease === turn
 
-  const maxAP = boardState.maxActionPoints ?? 5
+  const maxAP = boardState.maxActionPoints ?? DEFAULT_MAX_AP
 
   return (
-    <div className="w-full bg-bg-secondary flex items-center justify-between px-5 py-2.5">
+    <div className={cn('w-full bg-bg-secondary flex items-center justify-between px-5 py-2.5', className)}>
       {/* Jugador local */}
       <PlayerInfo
         name={myName}
@@ -114,18 +117,15 @@ function PlayerInfo({ name, team, avatarUrl, isActive, actionPoints, maxActionPo
       </Avatar>
 
       <div className={cn('flex flex-col gap-1', align === 'right' && 'items-end')}>
-        <span className={cn(
-          'font-inter text-[13px] font-semibold leading-none transition-colors duration-300',
-          isActive ? 'text-fg-primary' : 'text-fg-muted'
-        )}>
-          {name}
-        </span>
-        <div className={cn('flex items-center gap-1', align === 'right' && 'flex-row-reverse')}>
-          <span className="font-mono text-[10px] text-fg-muted uppercase">{team}</span>
-          {isActive && (
+        <PlayerIdentity
+          name={name}
+          team={team}
+          isActive={isActive}
+          align={align}
+          adornment={isActive ? (
             <span className="w-1.5 h-1.5 rounded-full bg-accent-green animate-pulse motion-reduce:animate-none" aria-hidden="true" />
-          )}
-        </div>
+          ) : undefined}
+        />
         <ActionPoints
           total={maxActionPoints}
           remaining={actionPoints}

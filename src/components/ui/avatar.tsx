@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/utils'
 
 interface AvatarProps { className?: string; children: ReactNode }
@@ -10,8 +10,20 @@ export function Avatar({ className, children }: AvatarProps) {
 }
 
 export function AvatarImage({ src, alt, className }: AvatarImageProps) {
-  if (!src) return null
-  return <img src={src} alt={alt ?? ''} className={cn('w-full h-full object-cover', className)} />
+  // Without onError a broken URL renders an empty box stacked over the initials
+  // fallback, so the fallback never shows. Drop out and let it through.
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { setFailed(false) }, [src])
+
+  if (!src || failed) return null
+  return (
+    <img
+      src={src}
+      alt={alt ?? ''}
+      onError={() => setFailed(true)}
+      className={cn('w-full h-full object-cover', className)}
+    />
+  )
 }
 
 export function AvatarFallback({ className, children }: AvatarFallbackProps) {
