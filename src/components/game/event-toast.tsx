@@ -21,7 +21,7 @@ const TOAST_CONFIG: Record<ToastEvent, string> = {
 
 export function EventToast({ className }: EventToastProps) {
     const t = useGameT()
-    const { boardState } = useGameStore()
+    const boardState = useGameStore(s => s.boardState)
     const [toast, setToast] = useState<{ type: ToastEvent; key: string } | null>(null)
 
     useEffect(() => {

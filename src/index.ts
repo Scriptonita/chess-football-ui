@@ -8,6 +8,7 @@ export { default as GameControls } from './components/game/game-controls'
 export { SelectedPieceDetail } from './components/game/selected-piece-detail'
 export { MoveHistory } from './components/game/move-history'
 export { StaticGameBoard } from './components/game/static-game-board'
+export { PlayerIdentity } from './components/game/player-identity'
 export { GrassOverlay, PitchMarkings, PitchSurface, pitchSquareClass, isGoalAreaSquare, GOAL_AREA_SHADE_CLASS, PITCH_COLS, PITCH_ROWS } from './components/game/pitch'
 export { TurnBanner } from './components/game/turn-banner'
 export { EventToast } from './components/game/event-toast'
@@ -26,6 +27,11 @@ export { ConfirmDialog } from './components/ui/confirm-dialog'
 // stay free of client-only React APIs so server code (e.g. Next.js route handlers
 // calling getInitialBoardState) can import it without pulling in the client bundle.
 // See ./store/use-game-store.
+
+// ── Design-token contract ─────────────────────────────────────────────────────
+// The visual counterpart to GAME_I18N_KEYS: a token the app fails to define
+// makes the rule vanish silently. Assert it in each consumer.
+export { REQUIRED_TOKENS, type RequiredToken } from './tokens'
 
 // ── i18n injection ────────────────────────────────────────────────────────────
 export { GameI18nProvider, useGameT, GAME_I18N_KEYS, type GameTranslator, type GameI18nKey } from './i18n'

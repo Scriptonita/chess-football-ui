@@ -14,7 +14,7 @@ interface MobileHistoryProps {
 }
 
 export function MobileHistory({ className }: MobileHistoryProps) {
-    const { boardState } = useGameStore()
+    const boardState = useGameStore(s => s.boardState)
     const [open, setOpen] = useState(false)
     const titleId = `${useId()}-title`
     const panelRef = useDialogA11y({ open, onClose: () => setOpen(false) })

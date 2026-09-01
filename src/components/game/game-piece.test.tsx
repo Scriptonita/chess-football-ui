@@ -35,7 +35,7 @@ describe('GamePiece — prefers-reduced-motion', () => {
     )
     const root = container.firstElementChild
     expect(root?.className).toContain('ring-4')
-    expect(root?.className).toContain('ring-primary')
+    expect(root?.className).toContain('ring-accent-green')
     expect(root?.className).toContain('scale-110')
   })
 })

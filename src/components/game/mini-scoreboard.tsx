@@ -1,6 +1,7 @@
 import { useGameStore } from '../../store/use-game-store'
 import { cn } from '../../lib/utils'
 import { useGameT } from '../../i18n'
+import { PlayerIdentity } from './player-identity'
 
 interface MiniScoreboardProps {
     creatorUsername: string
@@ -20,7 +21,7 @@ export function MiniScoreboard({
     className,
 }: MiniScoreboardProps) {
     const t = useGameT()
-    const { boardState } = useGameStore()
+    const boardState = useGameStore(s => s.boardState)
     if (!boardState?.score) return null
 
     const { score, turn } = boardState
@@ -75,12 +76,7 @@ interface SideCellProps {
 function SideCell({ name, team, score, isActive, align }: SideCellProps) {
     return (
         <div className={cn('flex flex-col min-w-0', align === 'right' ? 'items-end' : 'items-start')}>
-            <span className={cn(
-                'font-mono text-[10px] uppercase tracking-[0.5px] truncate max-w-[160px]',
-                isActive ? 'text-fg-secondary' : 'text-fg-muted',
-            )}>
-                {name} · {team}
-            </span>
+            <PlayerIdentity name={name} team={team} variant="compact" isActive={isActive} />
             <span className={cn(
                 'font-anton text-[32px] leading-none tabular-nums',
                 isActive ? 'text-fg-primary' : 'text-fg-secondary',

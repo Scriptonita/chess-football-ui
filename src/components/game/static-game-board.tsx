@@ -1,3 +1,4 @@
+import { cn } from '../../lib/utils'
 import { useMemo } from 'react'
 import { getInitialBoardState } from '../../store/use-game-store'
 import { Football } from './football'
@@ -7,11 +8,11 @@ import { PitchSurface } from './pitch'
 const COLS = 9
 const ROWS = 12
 
-export function StaticGameBoard() {
+export function StaticGameBoard({ className }: { className?: string } = {}) {
     const boardState = useMemo(() => getInitialBoardState('white'), [])
 
     return (
-        <div className="relative w-full overflow-hidden rounded-xl shadow-2xl border-4 border-[#1a3317] bg-[#1a3317]">
+        <div className={cn('relative w-full overflow-hidden rounded-xl shadow-2xl border-4 border-field-frame bg-field-frame', className)}>
             <PitchSurface>
                 <div className="absolute inset-0 pointer-events-none">
                     {boardState.pieces.map(piece => (

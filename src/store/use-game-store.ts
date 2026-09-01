@@ -6,6 +6,13 @@ import { applyMove, applyPass, applyEndTurn } from '@scriptonita/chess-football-
 // here so app imports from `@scriptonita/chess-football-ui/store` keep working.
 export { getInitialBoardState } from '@scriptonita/chess-football-engine'
 
+/**
+ * Fallback when a board predates configurable action points. `maxActionPoints`
+ * is optional on `BoardState`, and every consumer was inventing its own `?? 5`
+ * — except `TurnBanner`, which had none and rendered "3/" on an old match.
+ */
+export const DEFAULT_MAX_AP = 5
+
 interface GameStore {
     boardState: BoardState | null
     selectedPieceId: string | null
@@ -14,26 +21,41 @@ interface GameStore {
     setSelectedPieceId: (id: string | null) => void
     setInteractionMode: (mode: 'move' | 'pass' | null) => void
     resetTurn: () => void
+    /** Return the store to its initial state. */
+    reset: () => void
     movePiece: (pieceId: string, to: Position) => void
     passBall: (to: Position) => void
     endTurn: () => void
 }
 
-export const useGameStore = create<GameStore>((set) => ({
+const INITIAL = {
     boardState: null,
     selectedPieceId: null,
     interactionMode: null,
+} satisfies Pick<GameStore, 'boardState' | 'selectedPieceId' | 'interactionMode'>
+
+export const useGameStore = create<GameStore>((set) => ({
+    ...INITIAL,
 
     setBoardState: (state) => set({ boardState: state }),
     setSelectedPieceId: (id) => set({ selectedPieceId: id }),
     setInteractionMode: (mode) => set({ interactionMode: mode }),
+
+    /**
+     * The store is a module-global singleton, so a new match opens on the
+     * previous match's final board — which ended on a goal, and was therefore
+     * re-detected as a fresh goal (the bug behind webapp PR #42). Apps were
+     * each reaching for `useGameStore.setState({...})` by hand to work around
+     * it; this makes the intent explicit and keeps the shape in one place.
+     */
+    reset: () => set({ ...INITIAL }),
 
     resetTurn: () => set((state) => {
         if (!state.boardState) return state
         return {
             boardState: {
                 ...state.boardState,
-                actionPoints: state.boardState.maxActionPoints ?? 5,
+                actionPoints: state.boardState.maxActionPoints ?? DEFAULT_MAX_AP,
                 pieces: state.boardState.pieces.map(p => ({ ...p, hasMovedThisTurn: false })),
             },
         }

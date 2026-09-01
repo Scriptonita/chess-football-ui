@@ -114,7 +114,10 @@ export default function GamePiece({ piece, isSelected, hasBall, onClick, isMovin
             style={piece.hasMovedThisTurn ? MOVED_STYLE : undefined}
             className={cn(
                 "relative w-[88%] h-[88%] rounded-full cursor-pointer z-10 transition-transform duration-200 ease-out motion-reduce:transition-none",
-                isSelected && "ring-4 ring-primary scale-110 z-30",
+                // `--primary` was the package's one remaining shadcn token, and
+                // CrazyGames had to define it by hand just to make the selection
+                // ring visible. It is part of the design system now.
+                isSelected && "ring-4 ring-accent-green scale-110 z-30",
                 isMoving && "scale-[1.08] z-40",
                 piece.hasMovedThisTurn && "opacity-70"
             )}

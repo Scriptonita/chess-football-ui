@@ -8,6 +8,7 @@ import {
     type LucideIcon,
 } from 'lucide-react'
 import { useGameStore } from '../../store/use-game-store'
+import { useShallow } from 'zustand/react/shallow'
 import { Football } from './football'
 import { cn } from '../../lib/utils'
 import { LONG_KEY, squareName } from '@scriptonita/chess-football-engine'
@@ -33,7 +34,9 @@ interface SelectedPieceDetailProps {
  */
 export function SelectedPieceDetail({ isMyTurn, className }: SelectedPieceDetailProps) {
     const t = useGameT()
-    const { boardState, selectedPieceId } = useGameStore()
+    const { boardState, selectedPieceId } = useGameStore(
+        useShallow(s => ({ boardState: s.boardState, selectedPieceId: s.selectedPieceId })),
+    )
 
     if (!boardState) return null
 
@@ -71,7 +74,6 @@ export function SelectedPieceDetail({ isMyTurn, className }: SelectedPieceDetail
             )}
             role="status"
             aria-live="polite"
-            aria-label={`${longName} ${square}`}
         >
             <div
                 className={cn(
