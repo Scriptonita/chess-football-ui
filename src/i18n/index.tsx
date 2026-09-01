@@ -20,6 +20,7 @@ const STATIC_I18N_KEYS = [
   'actionPointsAriaLabel',
   'actionPointsShort',
   'ballHolder',
+  'boardAriaLabel',
   'endTurn',
   'endTurnConfirm',
   'endTurnConfirmDescription',
@@ -33,11 +34,13 @@ const STATIC_I18N_KEYS = [
   'history.pass',
   'history.tackle',
   'history.title',
+  'history.close',
   'history.turn',
   'history.viewAll',
   'move',
   'offsideWarning',
   'pass',
+  'scoreAriaLabel',
   'selectedPiece.alreadyMoved',
   'selectedPiece.atSquare',
   'selectedPiece.empty',
@@ -49,6 +52,14 @@ const STATIC_I18N_KEYS = [
   'shortcuts.pass',
   'shortcuts.select',
   'shortcuts.title',
+  'square.empty',
+  'square.emptyWithBall',
+  'square.moveOrPassTarget',
+  'square.moveTarget',
+  'square.passTarget',
+  'square.piece',
+  'square.pieceWithBall',
+  'square.selected',
   'teamBlack',
   'teamWhite',
   'waitingRival',
@@ -62,8 +73,9 @@ const PIECE_I18N_KEYS: PieceI18nKey[] = [...Object.values(SHORT_KEY), ...Object.
 )
 
 /** `eventToast.*` — one key per toastable event (see `ToastEvent` in `event-toast.tsx`). */
-type EventToastI18nKey = `eventToast.${'interception' | 'offside' | 'tackle'}`
+type EventToastI18nKey = `eventToast.${'goal' | 'interception' | 'offside' | 'tackle'}`
 const EVENT_TOAST_I18N_KEYS: EventToastI18nKey[] = [
+  'eventToast.goal',
   'eventToast.interception',
   'eventToast.offside',
   'eventToast.tackle',
@@ -85,7 +97,20 @@ export const GAME_I18N_KEYS: readonly GameI18nKey[] = [
   ...EVENT_TOAST_I18N_KEYS,
 ]
 
-const fallback: GameTranslator = (key) => key
+/**
+ * Identity fallback: renders the key itself when the host app has no catalog
+ * entry for it. It shouts in development because a missing key is invisible in
+ * production until a player screenshots `⚠ game.offsideWarning` on the pitch.
+ * `GAME_I18N_KEYS` exists so a test catches this before a human does.
+ */
+const nodeEnv = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV
+
+const fallback: GameTranslator = (key) => {
+  if (nodeEnv && nodeEnv !== 'production') {
+    console.warn(`[chess-football-ui] missing game i18n key: "${key}" (no GameI18nProvider?)`)
+  }
+  return key
+}
 
 const GameI18nContext = createContext<GameTranslator>(fallback)
 

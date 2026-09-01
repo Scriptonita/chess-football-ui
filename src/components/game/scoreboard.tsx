@@ -58,14 +58,19 @@ export default function Scoreboard({
         align="left"
       />
 
-      {/* Marcador central */}
-      <div className="flex items-center gap-3">
-        <span className="font-anton text-[32px] leading-none text-fg-primary tabular-nums">
+      {/* Marcador central. La región live lleva el texto en un `sr-only` en vez
+          de un `aria-label`: un `aria-label` sobre una región live silencia su
+          contenido y el lector nunca llegaría a anunciar el gol. */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="flex items-center gap-3">
+        <span aria-hidden="true" className="font-anton text-[32px] leading-none text-fg-primary tabular-nums">
           {myScore}
         </span>
-        <span className="font-anton text-2xl text-fg-muted">—</span>
-        <span className="font-anton text-[32px] leading-none text-fg-primary tabular-nums">
+        <span aria-hidden="true" className="font-anton text-2xl text-fg-muted">—</span>
+        <span aria-hidden="true" className="font-anton text-[32px] leading-none text-fg-primary tabular-nums">
           {rivalScore}
+        </span>
+        <span className="sr-only">
+          {t('scoreAriaLabel', { me: myName, myScore, rival: rivalName, rivalScore })}
         </span>
       </div>
 
