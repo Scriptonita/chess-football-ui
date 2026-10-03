@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { checkGoal } from '@scriptonita/chess-football-engine'
-import type { BoardState, BotTurn, Side } from '@scriptonita/chess-football-engine'
+import type { BoardState, Side } from '@scriptonita/chess-football-engine'
 
 /**
  * Pause between the turn changing hands and the bot's first action. Long enough
@@ -30,8 +30,19 @@ export const BOT_TURN_SETTLE_MS = 500
 // a synchronous (local) search cannot block the frame that paints that state.
 const PROVIDER_DEFER_MS = 30
 
-/** What a turn provider must hand back — the engine's `playBotTurn` result as-is. */
-export type BotTurnPlayback = Pick<BotTurn, 'states'> & Partial<Pick<BotTurn, 'closedByEndTurn' | 'goalScored'>>
+/**
+ * What a turn provider must hand back. It is the shape of the engine's
+ * `playBotTurn` result (engine ≥ 0.7.0), so a local provider returns that as-is;
+ * a server-backed one rebuilds it from its response.
+ */
+export interface BotTurnPlayback {
+    /** Board after each applied action, in order. Must not be empty. */
+    states: BoardState[]
+    /** True when the last state is a bare end-of-turn: it gets no display step. */
+    closedByEndTurn?: boolean
+    /** Side that scored during the turn, if any. */
+    goalScored?: Side | null
+}
 
 export interface UseBotTurnOptions {
     /** Current board; the bot plays when `boardState.turn === botSide`. */
