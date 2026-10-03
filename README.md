@@ -90,9 +90,9 @@ const { botThinking, error, retry, skip } = useBotTurn({
 })
 ```
 
-Pacing is fixed in one place: `BOT_TURN_START_DELAY_MS` (400) before the first action and
-`BOT_TURN_STEP_MS` (900) per action. The closing end-of-turn state takes no step of its own,
-so a full 5-AP turn lasts 4.9 s.
+Pacing is fixed in one place: `BOT_TURN_START_DELAY_MS` (400) before the first action,
+`BOT_TURN_STEP_MS` (900) between actions and `BOT_TURN_SETTLE_MS` (500) for the last one to
+land. The closing end-of-turn state takes no step of its own, so a full 5-AP turn lasts 4.5 s.
 
 ## First-match hints
 

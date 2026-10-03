@@ -22,7 +22,7 @@ export { GameHints, GAME_HINT_IDS, type GameHintId } from './components/game/gam
 // cancellation, error + retry, skip. The app only supplies where the turn comes
 // from (the engine's `playBotTurn` locally, or a fetch to its own server).
 export {
-  useBotTurn, BOT_TURN_START_DELAY_MS, BOT_TURN_STEP_MS,
+  useBotTurn, BOT_TURN_START_DELAY_MS, BOT_TURN_STEP_MS, BOT_TURN_SETTLE_MS,
   type UseBotTurnOptions, type UseBotTurnResult, type BotTurnPlayback,
 } from './hooks/use-bot-turn'
 

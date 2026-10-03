@@ -3,7 +3,10 @@ import { StrictMode, useState } from 'react'
 import { act, render, renderHook } from '@testing-library/react'
 import { applyEndTurn, applyMove, getInitialBoardState, getValidMoves } from '@scriptonita/chess-football-engine'
 import type { BoardState, Side } from '@scriptonita/chess-football-engine'
-import { useBotTurn, BOT_TURN_START_DELAY_MS, BOT_TURN_STEP_MS, type BotTurnPlayback, type UseBotTurnOptions } from './use-bot-turn'
+import {
+    useBotTurn, BOT_TURN_START_DELAY_MS, BOT_TURN_STEP_MS, BOT_TURN_SETTLE_MS,
+    type BotTurnPlayback, type UseBotTurnOptions,
+} from './use-bot-turn'
 
 /** A black turn of `moves` real moves, optionally closed by a bare end-of-turn. */
 function blackTurn(moves: number, closedByEndTurn = true): { start: BoardState; turn: BotTurnPlayback } {
@@ -65,8 +68,9 @@ describe('useBotTurn — pacing', () => {
         expect(turn.states[4].turn).toBe('white')
         const { result, applied } = mount(start, { getTurn: () => turn })
 
-        const total = BOT_TURN_START_DELAY_MS + 5 * BOT_TURN_STEP_MS
-        expect(total).toBeLessThan(5000)
+        const total = BOT_TURN_START_DELAY_MS + 4 * BOT_TURN_STEP_MS + BOT_TURN_SETTLE_MS
+        // Half a second of slack for the search / the network, not a photo finish.
+        expect(total).toBeLessThanOrEqual(4500)
         await advance(total - 1)
         expect(result.current.botThinking).toBe(true)
         await advance(1)
@@ -79,7 +83,7 @@ describe('useBotTurn — pacing', () => {
         const { start, turn } = blackTurn(3)
         const { result, applied } = mount(start, { getTurn: () => turn })
 
-        await advance(BOT_TURN_START_DELAY_MS + 3 * BOT_TURN_STEP_MS - 1)
+        await advance(BOT_TURN_START_DELAY_MS + 2 * BOT_TURN_STEP_MS + BOT_TURN_SETTLE_MS - 1)
         expect(applied).toHaveLength(3)
         expect(result.current.botThinking).toBe(true)
 
@@ -89,14 +93,16 @@ describe('useBotTurn — pacing', () => {
         expect(result.current.botThinking).toBe(false)
     })
 
-    it('gives the last action its full step when the turn was not closed by an end-of-turn', async () => {
+    it('lets the last action land (settle) before handing the turn over', async () => {
         const { start, turn } = blackTurn(2, false)
         const { result, applied } = mount(start, { getTurn: () => turn })
 
         await advance(BOT_TURN_START_DELAY_MS + BOT_TURN_STEP_MS)
         expect(applied).toHaveLength(2)
         expect(result.current.botThinking).toBe(true)
-        await advance(BOT_TURN_STEP_MS)
+        await advance(BOT_TURN_SETTLE_MS - 1)
+        expect(result.current.botThinking).toBe(true)
+        await advance(1)
         expect(result.current.botThinking).toBe(false)
     })
 
@@ -179,7 +185,7 @@ describe('useBotTurn — goal, skip, errors, lifecycle', () => {
 
         await advance(BOT_TURN_START_DELAY_MS + BOT_TURN_STEP_MS)
         expect(onGoal).not.toHaveBeenCalled()
-        await advance(BOT_TURN_STEP_MS)
+        await advance(BOT_TURN_SETTLE_MS)
         expect(onGoal).toHaveBeenCalledExactlyOnceWith('black', turn.states[1])
     })
 

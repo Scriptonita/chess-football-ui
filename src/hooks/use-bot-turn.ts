@@ -10,12 +10,21 @@ import type { BoardState, BotTurn, Side } from '@scriptonita/chess-football-engi
 export const BOT_TURN_START_DELAY_MS = 400
 
 /**
- * How long each bot action stays on screen. The piece/ball springs settle in
- * 300–500 ms, so 900 ms leaves a clear beat between actions. A full 5-AP turn
- * is 400 + 5 × 900 = 4.9 s: the closing end-of-turn state is applied without a
- * step of its own (nothing moves in it, so there is nothing to watch).
+ * How long each bot action stays on screen before the next one. The piece/ball
+ * springs settle in 300–500 ms, so 900 ms leaves a clear beat between actions.
  */
 export const BOT_TURN_STEP_MS = 900
+
+/**
+ * How long the LAST action stays before the turn is handed over. Nothing follows
+ * it, so it only needs its animation to land — the board then stays as it is,
+ * under the player's control. The closing end-of-turn state is applied at that
+ * same moment, without a step of its own (nothing moves in it).
+ *
+ * A full 5-AP turn is 400 + 4 × 900 + 500 = 4.5 s, which leaves half a second
+ * of slack under 5 s for a slow search or a slow network.
+ */
+export const BOT_TURN_SETTLE_MS = 500
 
 // The turn provider is called a beat after the "bot is playing" state is set, so
 // a synchronous (local) search cannot block the frame that paints that state.
@@ -49,6 +58,7 @@ export interface UseBotTurnOptions {
     /** Override the default pacing (tests, debug). */
     startDelayMs?: number
     stepMs?: number
+    settleMs?: number
 }
 
 export interface UseBotTurnResult {
@@ -133,6 +143,7 @@ export function useBotTurn(opts: UseBotTurnOptions): UseBotTurnResult {
 
         const startDelay = o.startDelayMs ?? BOT_TURN_START_DELAY_MS
         const stepMs = o.stepMs ?? BOT_TURN_STEP_MS
+        const settleMs = o.settleMs ?? BOT_TURN_SETTLE_MS
 
         ;(async () => {
             try {
@@ -161,7 +172,7 @@ export function useBotTurn(opts: UseBotTurnOptions): UseBotTurnResult {
 
                 for (let i = 0; i < shown; i++) {
                     optsRef.current.onApplyState(states[i])
-                    await wait(stepMs)
+                    await wait(i === shown - 1 ? settleMs : stepMs)
                     // `skip` and unmount both clear the timers, so a cancelled wait
                     // never resolves and this loop simply stops here.
                     if (!alive()) return
