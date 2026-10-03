@@ -14,7 +14,8 @@ export type GameTranslator = (key: string, values?: Record<string, unknown>) => 
  * Static leaf keys the package's components read via `useGameT` with a literal `t('…')` call.
  * Keep in sync with those call sites — recipe:
  *   grep -rhoE "t\('[a-zA-Z0-9_.]+'" src/components | sed -E "s/t\('//;s/'//" | sort -u
- * (the dynamic `pieces.*` / `eventToast.*` families are derived separately below).
+ * (the dynamic `pieces.*` / `eventToast.*` families are derived separately below;
+ * `hints.*` is read through a template literal in `game-hints.tsx`, one key per `GameHintId`).
  */
 const STATIC_I18N_KEYS = [
   'actionPointsAriaLabel',
@@ -26,6 +27,11 @@ const STATIC_I18N_KEYS = [
   'endTurnConfirmDescription',
   'endTurnConfirmYes',
   'endTurnKeepPlaying',
+  'hints.dismiss',
+  'hints.hasBall',
+  'hints.lastActionPoint',
+  'hints.selectPiece',
+  'hints.start',
   'history.empty',
   'history.goal',
   'history.interception',

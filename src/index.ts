@@ -15,6 +15,16 @@ export { EventToast } from './components/game/event-toast'
 export { MobileHistory } from './components/game/mobile-history'
 export { BallHolderChip } from './components/game/ball-holder-chip'
 export { KeyboardShortcutsList } from './components/game/keyboard-shortcuts'
+export { GameHints, GAME_HINT_IDS, type GameHintId } from './components/game/game-hints'
+
+// ── Bot turn ──────────────────────────────────────────────────────────────────
+// One implementation of the bot's turn for every app: gates, timed replay,
+// cancellation, error + retry, skip. The app only supplies where the turn comes
+// from (the engine's `playBotTurn` locally, or a fetch to its own server).
+export {
+  useBotTurn, BOT_TURN_START_DELAY_MS, BOT_TURN_STEP_MS,
+  type UseBotTurnOptions, type UseBotTurnResult, type BotTurnPlayback,
+} from './hooks/use-bot-turn'
 
 // ── UI primitives ─────────────────────────────────────────────────────────────
 export { ActionPoints } from './components/action-points'

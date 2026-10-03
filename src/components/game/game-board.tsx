@@ -26,6 +26,15 @@ interface GameBoardProps {
      * `KeyboardShortcutsList` itself (e.g. in a side panel) so nothing is shown twice.
      */
     toolbar?: boolean
+    /**
+     * Forgive a near-miss on touch: with a piece selected, a tap on an empty,
+     * non-target square that touches exactly ONE legal target resolves to that
+     * target. A phone square is ~35–40 px — under the 44 px a fingertip needs — and
+     * cannot be made bigger (9 files across the screen), so the miss is absorbed
+     * instead. Never applies to mouse or keyboard, nor when the tap is ambiguous.
+     * Opt-in: an app that sees unwanted plays turns it off without a release.
+     */
+    forgivingTaps?: boolean
     className?: string
 }
 
@@ -42,6 +51,9 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 const cellX = (x: number) => `${x * 100}%`
 const cellY = (y: number) => `${(ROWS - 1 - y) * 100}%`
 
+// A click this soon after a touchstart is that touch's own synthesized click.
+const TOUCH_CLICK_WINDOW_MS = 800
+
 // Critically-damped springs (ratio ≈ 1.0): a firm push-off, a long glide and
 // a soft landing with no bounce — a chip sliding across turf, not a rubber
 // ball. Settles in roughly half a second regardless of distance, so a long
@@ -51,7 +63,7 @@ const cellY = (y: number) => `${(ROWS - 1 - y) * 100}%`
 const PIECE_SLIDE = { type: 'spring' as const, stiffness: 190, damping: 28, mass: 1 }
 const BALL_SLIDE  = { type: 'spring' as const, stiffness: 300, damping: 26, mass: 0.6 }
 
-export default function GameBoard({ userSide, showCoordinates = false, keyboardNav = true, toolbar = true, className }: GameBoardProps) {
+export default function GameBoard({ userSide, showCoordinates = false, keyboardNav = true, toolbar = true, forgivingTaps = false, className }: GameBoardProps) {
     const t = useGameT()
     const boardId = useId()
     const prefersReducedMotion = useReducedMotion()
@@ -98,6 +110,7 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
         setInvalidClickAt({ x, y, nonce: invalidClickNonceRef.current })
     }
     const [hoveredPassAt, setHoveredPassAt] = useState<Position | null>(null)
+    const lastTouchAtRef = useRef(0)
 
     // Pieces currently travelling between squares (framer-motion drives the
     // slide; this only toggles the lift/shadow cue on GamePiece).
@@ -238,11 +251,30 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
     const trajectoryIntercepted = !!(trajectoryPath && passCarrier && trajectoryPath
         .some(sq => boardState.pieces.some(p => p.pos.x === sq.x && p.pos.y === sq.y && p.side !== passCarrier.side)))
 
-    const handleSquareClick = (x: number, y: number) => {
+    // The one legal target touching (x, y), or null when there is none or several:
+    // a tap between two targets says nothing about which one was meant.
+    const soleAdjacentTarget = (x: number, y: number): Position | null => {
+        const near = [...validMoves, ...validPasses].filter(
+            (t, i, all) =>
+                Math.max(Math.abs(t.x - x), Math.abs(t.y - y)) === 1 &&
+                all.findIndex(o => o.x === t.x && o.y === t.y) === i,
+        )
+        return near.length === 1 ? near[0] : null
+    }
+
+    const handleSquareClick = (x: number, y: number, fromTouch = false) => {
         if (replay) return // §4: don't act while the opponent-turn replay is playing
         setCursor(null)
         const isValidMove = validMoves.some(m => m.x === x && m.y === y)
         const isValidPass = validPasses.some(p => p.x === x && p.y === y)
+
+        if (!isValidMove && !isValidPass && fromTouch && forgivingTaps && selectedPieceId) {
+            const target = soleAdjacentTarget(x, y)
+            if (target) {
+                handleSquareClick(target.x, target.y)
+                return
+            }
+        }
 
         if (isValidMove && isValidPass) {
             setDisambiguateAt({ x, y })
@@ -431,14 +463,17 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                         role="gridcell"
                         aria-label={squareLabel(x, y, pieceAt, isValidMove, isValidPass)}
                         aria-selected={!!pieceAt && pieceAt.id === selectedPieceId}
-                        onClick={() => handleSquareClick(x, y)}
+                        onClick={() => handleSquareClick(x, y, Date.now() - lastTouchAtRef.current < TOUCH_CLICK_WINDOW_MS)}
                         onMouseEnter={() => { if (isValidPass) setHoveredPassAt({ x, y }) }}
                         onMouseLeave={() => setHoveredPassAt(null)}
                         // The preview hung off onMouseEnter alone, so it never
                         // appeared on the touch devices that are most of the
                         // CrazyGames audience. A first touch previews the
                         // trajectory; handleSquareClick then confirms it.
-                        onTouchStart={() => { if (isValidPass) setHoveredPassAt({ x, y }) }}
+                        onTouchStart={() => {
+                            lastTouchAtRef.current = Date.now()
+                            if (isValidPass) setHoveredPassAt({ x, y })
+                        }}
                         className={cn(
                             pitchSquareClass(x, y),
                             "flex items-center justify-center cursor-pointer",
@@ -562,7 +597,7 @@ export default function GameBoard({ userSide, showCoordinates = false, keyboardN
                                 onClick={(e) => { e.stopPropagation(); setShortcutsOpen(o => !o) }}
                                 aria-label={t('shortcuts.buttonLabel')}
                                 aria-expanded={shortcutsOpen}
-                                className="w-8 h-8 flex items-center justify-center rounded-full bg-bg-secondary/80 border border-border-subtle text-fg-muted hover:text-fg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
+                                className="w-11 h-11 flex items-center justify-center rounded-full bg-bg-secondary/80 border border-border-subtle text-fg-muted hover:text-fg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
                             >
                                 <HelpCircle size={16} strokeWidth={2} aria-hidden="true" />
                             </button>

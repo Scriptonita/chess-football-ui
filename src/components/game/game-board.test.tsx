@@ -543,3 +543,67 @@ describe('GameBoard — keyboard shortcut guards', () => {
     expect(screen.queryByText('move')).not.toBeInTheDocument()
   })
 })
+
+describe('GameBoard — forgiving taps on touch (Fitts)', () => {
+  const SELECTED = 'white_rook_0_1'
+  const board = getInitialBoardState('white')
+  const occupied = (x: number, y: number) => board.pieces.some(p => p.pos.x === x && p.pos.y === y)
+  // An empty legal target with an empty square right beside it (the near-miss).
+  const target = { x: 0, y: 6 }
+  const miss = { x: 1, y: 6 }
+  const cell = (c: HTMLElement, x: number, y: number) => c.querySelector(`[id$="-sq-${x}-${y}"]`) as HTMLElement
+  const rookPos = () => useGameStore.getState().boardState!.pieces.find(p => p.id === SELECTED)!.pos
+
+  const setup = (props: { forgivingTaps?: boolean }, moves = [target]) => {
+    expect(occupied(target.x, target.y) || occupied(miss.x, miss.y)).toBe(false)
+    vi.mocked(getValidMoves).mockReturnValue(moves)
+    vi.mocked(getValidPasses).mockReturnValue([])
+    useGameStore.setState({ boardState: board, selectedPieceId: SELECTED })
+    return render(<GameBoard userSide="white" {...props} />).container
+  }
+  const tap = (el: HTMLElement) => { fireEvent.touchStart(el); fireEvent.click(el) }
+
+  it('resolves a touch on a square beside the only legal target to that target', () => {
+    const c = setup({ forgivingTaps: true })
+    tap(cell(c, miss.x, miss.y))
+    expect(rookPos()).toEqual(target)
+    expect(screen.queryByTestId('invalid-action-shake')).not.toBeInTheDocument()
+  })
+
+  it('does not guess when the tap touches two legal targets', () => {
+    const c = setup({ forgivingTaps: true }, [target, { x: 2, y: 6 }])
+    tap(cell(c, miss.x, miss.y))
+    expect(rookPos()).toEqual({ x: 0, y: 1 })
+    expect(screen.getByTestId('invalid-action-shake')).toBeInTheDocument()
+  })
+
+  it('never applies to a mouse click', () => {
+    const c = setup({ forgivingTaps: true })
+    fireEvent.click(cell(c, miss.x, miss.y))
+    expect(rookPos()).toEqual({ x: 0, y: 1 })
+    expect(screen.getByTestId('invalid-action-shake')).toBeInTheDocument()
+  })
+
+  it('is off unless the app opts in', () => {
+    const c = setup({})
+    tap(cell(c, miss.x, miss.y))
+    expect(rookPos()).toEqual({ x: 0, y: 1 })
+    expect(screen.getByTestId('invalid-action-shake')).toBeInTheDocument()
+  })
+
+  it('leaves a tap far from every target as a plain miss', () => {
+    const c = setup({ forgivingTaps: true })
+    tap(cell(c, 4, 6))
+    expect(rookPos()).toEqual({ x: 0, y: 1 })
+  })
+})
+
+describe('GameBoard — icon buttons meet the 44px target', () => {
+  it('sizes the shortcuts button like the package Button', () => {
+    useGameStore.setState({ boardState: getInitialBoardState('white') })
+    render(withI18n(<GameBoard userSide="white" />))
+    const btn = screen.getByRole('button', { name: 'shortcuts.buttonLabel' })
+    expect(btn.className).toContain('w-11')
+    expect(btn.className).toContain('h-11')
+  })
+})

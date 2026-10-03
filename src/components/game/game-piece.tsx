@@ -39,7 +39,24 @@ const EMBOSS_FILTER: Record<Piece['side'], string> = {
     black: 'drop-shadow(0 -0.5px 0 rgba(255,255,255,0.3)) drop-shadow(0 1.25px 1.5px rgba(0,0,0,0.8))',
 }
 
-export const PieceIcon = ({ type, side }: { type: Piece['type']; side: Piece['side'] }) => {
+/**
+ * "Already moved this turn" is said ONE way: the glyph fades to grey, and the
+ * chip is left alone. It used to be said three times at once — desaturate +
+ * darken the whole piece, then 70 % opacity on top — and the opacity was the
+ * problem: a translucent black chip takes on the green beneath it and all but
+ * vanishes into the pitch. An opaque chip keeps the exact silhouette contrast of
+ * a piece that has not moved; only its figure is muted.
+ *
+ * The black-side grey is as dark as it can go while the piece (chip or glyph,
+ * whichever stands out more) stays at 3:1 or better on every pitch green either
+ * app ships — see the contrast test.
+ */
+export const MOVED_GLYPH_COLOR: Record<Piece['side'], string> = {
+    white: '#8b8b94',
+    black: '#bdbdc3',
+}
+
+export const PieceIcon = ({ type, side, moved = false }: { type: Piece['type']; side: Piece['side']; moved?: boolean }) => {
     const Icon = PIECE_ICON[type] ?? ShieldQuestion
     // Size scales with the board container width (cqw); clamp keeps the glyph
     // readable on small screens and avoids overflow on very large ones.
@@ -47,6 +64,7 @@ export const PieceIcon = ({ type, side }: { type: Piece['type']; side: Piece['si
         width: 'clamp(16px, 7.4cqw, 44px)',
         height: 'clamp(16px, 7.4cqw, 44px)',
         filter: EMBOSS_FILTER[side],
+        ...(moved ? { color: MOVED_GLYPH_COLOR[side] } : null),
     }
     return <Icon style={style} strokeWidth={2} aria-hidden="true" />
 }
@@ -101,17 +119,13 @@ const ON_BOARD_CHIP_STYLE: Record<Piece['side'], React.CSSProperties> = {
     },
 }
 
-const MOVED_STYLE: React.CSSProperties = {
-    filter: 'saturate(0.15) brightness(0.75)',
-}
-
 export default function GamePiece({ piece, isSelected, hasBall, onClick, isMoving = false }: GamePieceProps) {
     const chipStyle = ON_BOARD_CHIP_STYLE[piece.side]
 
     return (
         <div
             onClick={onClick}
-            style={piece.hasMovedThisTurn ? MOVED_STYLE : undefined}
+            data-moved={piece.hasMovedThisTurn ? 'true' : 'false'}
             className={cn(
                 "relative w-[88%] h-[88%] rounded-full cursor-pointer z-10 transition-transform duration-200 ease-out motion-reduce:transition-none",
                 // `--primary` was the package's one remaining shadcn token, and
@@ -119,7 +133,6 @@ export default function GamePiece({ piece, isSelected, hasBall, onClick, isMovin
                 // ring visible. It is part of the design system now.
                 isSelected && "ring-4 ring-accent-green scale-110 z-30",
                 isMoving && "scale-[1.08] z-40",
-                piece.hasMovedThisTurn && "opacity-70"
             )}
         >
             {/* Ground shadow — light comes from the top-left, so it falls to the
@@ -142,7 +155,7 @@ export default function GamePiece({ piece, isSelected, hasBall, onClick, isMovin
                 style={chipStyle}
                 className="absolute inset-0 rounded-full flex items-center justify-center"
             >
-                <PieceIcon type={piece.type} side={piece.side} />
+                <PieceIcon type={piece.type} side={piece.side} moved={piece.hasMovedThisTurn} />
 
                 {hasBall && (
                     <div className="absolute inset-0 rounded-full ring-2 ring-orange-400 pointer-events-none" />

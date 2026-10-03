@@ -5,6 +5,14 @@ interface FootballProps {
     className?: string
 }
 
+// The ball takes the app's `--ball-color` token. It used to be a hardcoded sky
+// blue — the very hue of `--pass-highlight` — so with pass targets lit up the
+// ball dissolved into its own highlights, while both apps defined a
+// `--ball-color` nobody read. The rim is the same colour shaded, so the sphere
+// keeps its volume whatever the token is.
+const BALL_COLOR = 'var(--ball-color, #ffffff)'
+const BALL_SHADE = 'color-mix(in srgb, var(--ball-color, #ffffff) 74%, #000000)'
+
 export const Football = ({ className }: FootballProps) => {
     const bodyId = useId()
     const hiId = `${bodyId}-h`
@@ -18,9 +26,9 @@ export const Football = ({ className }: FootballProps) => {
         >
             <defs>
                 <radialGradient id={bodyId} cx="36%" cy="32%" r="68%">
-                    <stop offset="0%" stopColor="#f0f9ff" />
-                    <stop offset="55%" stopColor="#bae6fd" />
-                    <stop offset="100%" stopColor="#38bdf8" />
+                    <stop offset="0%" style={{ stopColor: '#ffffff' }} />
+                    <stop offset="55%" style={{ stopColor: BALL_COLOR }} />
+                    <stop offset="100%" style={{ stopColor: BALL_SHADE }} />
                 </radialGradient>
                 <radialGradient id={hiId} cx="32%" cy="28%" r="22%">
                     <stop offset="0%" stopColor="#ffffff" stopOpacity="0.85" />

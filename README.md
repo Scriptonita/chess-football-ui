@@ -67,6 +67,45 @@ expect(REQUIRED_TOKENS.filter(t => !css.includes(`${t}:`))).toEqual([])
 `--field-frame` is new in 0.9.0: the board frame was hardcoded `#1a3317` in three places,
 hand-tuned for the webapp's grass and visibly wrong against the CrazyGames pitch.
 
+`--ball-color` joins the contract in 0.10.0: the ball was a hardcoded sky blue, the same
+hue as `--pass-highlight`, while both apps defined a `--ball-color` nobody read.
+
+## Bot turn
+
+`useBotTurn` owns a bot's turn end to end — entry gates (turn, pending goal, match over),
+timed replay, cancellation on unmount, error + retry, and skip. The app only says where the
+turn comes from, so the same hook serves a local search and a server call:
+
+```tsx
+import { useBotTurn } from '@scriptonita/chess-football-ui'
+import { playBotTurn } from '@scriptonita/chess-football-engine'
+
+const { botThinking, error, retry, skip } = useBotTurn({
+  boardState, botSide,
+  getTurn: (board, side) => playBotTurn(bot, board, side),       // local
+  // getTurn: (board) => fetch('/api/turn', …).then(r => r.json()), // server
+  onApplyState: setBoardState,
+  matchOver: !!matchResult,
+  goalPending: !!goalScored,
+})
+```
+
+Pacing is fixed in one place: `BOT_TURN_START_DELAY_MS` (400) before the first action and
+`BOT_TURN_STEP_MS` (900) per action. The closing end-of-turn state takes no step of its own,
+so a full 5-AP turn lasts 4.9 s.
+
+## First-match hints
+
+`<GameHints userSide seen onSeen />` shows one dismissible sentence the first time each
+situation happens (`GAME_HINT_IDS`: first turn, selecting a piece, holding the ball, last
+action point). The texts are `hints.*` keys of `GAME_I18N_KEYS`. The app decides when to mount
+it and where `seen` is stored.
+
+## Forgiving taps
+
+`<GameBoard forgivingTaps />` resolves a touch on an empty square that borders exactly one
+legal target to that target. Opt-in, touch only, never when the tap is ambiguous.
+
 ## Peer dependencies
 
 `react`, `react-dom`, `framer-motion`, `lucide-react`.
