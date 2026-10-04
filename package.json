@@ -40,7 +40,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@scriptonita/chess-football-engine": "^0.6.0",
+    "@scriptonita/chess-football-engine": "^0.7.0",
     "clsx": "^2.1.1",
     "tailwind-merge": "^3.3.0",
     "zustand": "^5.0.9"
