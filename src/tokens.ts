@@ -42,6 +42,7 @@ export const REQUIRED_TOKENS = [
   '--move-highlight',
   '--pass-highlight',
   '--last-move-highlight',
+  '--ball-color',
 ] as const
 
 export type RequiredToken = (typeof REQUIRED_TOKENS)[number]

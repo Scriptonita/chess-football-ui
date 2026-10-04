@@ -73,7 +73,7 @@ function SheetHeader({ titleId, onClose }: { titleId: string; onClose: () => voi
             </span>
             <button
                 onClick={onClose}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-bg-surface hover:bg-bg-surface-elevated text-fg-muted hover:text-fg-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
+                className="w-11 h-11 -mr-2 flex items-center justify-center rounded-full bg-bg-surface hover:bg-bg-surface-elevated text-fg-muted hover:text-fg-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-green"
                 aria-label={t('history.close')}
             >
                 <X size={14} aria-hidden="true" />
